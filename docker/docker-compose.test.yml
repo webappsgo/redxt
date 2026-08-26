@@ -1,0 +1,69 @@
+# redxt - test compose - AI/AUTOMATED TESTING ONLY
+
+name: redxt-test
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  redxt:
+    image: ghcr.io/webappsgo/redxt:devel
+    container_name: redxt-test-app
+    hostname: redxt-test
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      PORT: 80
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: redxt-test-app
+      CACHE_URL: valkey://redxt-test-cache:6379
+      MODE: debug
+      DEBUG: "true"
+    volumes:
+      - ./volumes/config:/config:z
+      - ./volumes/data:/data:z
+    ports:
+      - "172.17.0.1:64582:80"
+      # DNS listener ports, remapped off the standard 53/853 so this can run
+      # alongside a production instance on the same host without conflict.
+      - "5354:53/tcp"
+      - "5354:53/udp"
+      - "8854:853/tcp"
+      - "8854:853/udp"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/redxt", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      redxt-test-cache:
+        condition: service_healthy
+    networks:
+      - redxt-test
+
+  redxt-test-cache:
+    image: valkey/valkey:alpine
+    container_name: redxt-test-cache
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    volumes:
+      - ./volumes/data/db/valkey:/data:z
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - redxt-test
+
+networks:
+  redxt-test:
+    name: redxt-test
+    external: false

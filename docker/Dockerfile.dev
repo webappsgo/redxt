@@ -1,0 +1,90 @@
+# =============================================================================
+# Build Stage - Compile Go binary (debug build, symbols retained)
+# =============================================================================
+FROM casjaysdev/go:latest AS builder
+
+# Install git and bash (git: required for go mod download; bash: for build scripts)
+RUN apk add --no-cache git bash
+
+ARG TARGETARCH
+ARG VERSION=devel
+ARG BUILD_DATE
+ARG BUILD_EPOCH
+ARG COMMIT_ID
+# Optional: set via --build-arg OFFICIAL_SITE=... (empty by default)
+ARG OFFICIAL_SITE
+
+WORKDIR /app
+
+# Copy go.mod first for layer caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source and build
+# Debug build: no -s -w so symbols/DWARF are retained for debugging tools
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -ldflags "-X 'main.Version=${VERSION}' -X 'main.CommitID=${COMMIT_ID}' -X 'main.BuildEpoch=${BUILD_EPOCH}' -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
+    -o /app/binary/redxt ./src
+
+# =============================================================================
+# Runtime Stage - Minimal Alpine image with debug tooling
+# =============================================================================
+FROM alpine:latest
+
+# ARGs for build-time values (set by docker build --build-arg)
+ARG VERSION=devel
+ARG BUILD_DATE
+ARG BUILD_EPOCH
+ARG COMMIT_ID
+ARG LICENSE=MIT
+
+# No LABEL blocks — all image metadata is applied as OCI annotations at build time.
+# See dockerfile_conventions.md → OCI Annotations.
+
+# Install required packages plus debug tooling (curl already covers most
+# troubleshooting needs; strace/less added for interactive debugging)
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash \
+    tini \
+    tor \
+    strace \
+    less
+
+# NO directory creation - binary handles ALL setup based on env vars
+
+# Copy binary from builder stage (multi-stage build)
+COPY --from=builder /app/binary/redxt /usr/local/bin/redxt
+
+# Copy BUILD-TIME overlay (entrypoint.sh) from docker/rootfs/ into image
+COPY docker/rootfs/ /
+
+# Copy Dockerfile to image (for reference and backup)
+COPY docker/Dockerfile.dev /root/Dockerfile.dev
+
+# Make all binaries/scripts in /usr/local/bin executable (755)
+RUN chmod 755 /usr/local/bin/*
+
+# Set environment
+# Devel image runs in development/debug mode by default - this is the one
+# image variant where MODE/DEBUG ARE baked in, since :devel exists solely
+# for that purpose (see docker-compose.dev.yml, "HUMAN USE ONLY")
+ENV TZ=America/New_York \
+    DATABASE_DIR=/data/db/sqlite \
+    MODE=development \
+    DEBUG=true
+
+# Expose internal port (always 80)
+EXPOSE 80
+
+# Stop signal for graceful shutdown
+STOPSIGNAL SIGRTMIN+3
+
+# Health check (shorter start period - devel image is for fast iteration)
+HEALTHCHECK --start-period=2m --interval=1m --timeout=15s --retries=3 \
+    CMD /usr/local/bin/redxt --status || exit 1
+
+# Use tini as init with signal propagation
+ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]

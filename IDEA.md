@@ -19,6 +19,8 @@ project_name:    redxt
 project_org:     webappsgo
 # FROZEN — equals project_name on first install, never changes
 internal_name:   redxt
+# FROZEN — equals project_org
+internal_org:    webappsgo
 app_name:        redxt
 official_site:   redxt.us
 license:         MIT

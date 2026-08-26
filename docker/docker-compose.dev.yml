@@ -1,0 +1,70 @@
+# nginx proxy address - http://172.17.0.1:64581
+# redxt - development compose - HUMAN USE ONLY
+
+name: redxt-dev
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  redxt:
+    image: ghcr.io/webappsgo/redxt:devel
+    container_name: redxt-dev-app
+    hostname: redxt-dev
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      PORT: 80
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: redxt-dev-app
+      CACHE_URL: valkey://redxt-dev-cache:6379
+      MODE: development
+      DEBUG: "true"
+    volumes:
+      - ./volumes/config:/config:z
+      - ./volumes/data:/data:z
+    ports:
+      - "172.17.0.1:64581:80"
+      # DNS listener ports, remapped off the standard 53/853 so this can run
+      # alongside a production instance on the same host without conflict.
+      - "5353:53/tcp"
+      - "5353:53/udp"
+      - "8853:853/tcp"
+      - "8853:853/udp"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/redxt", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      redxt-dev-cache:
+        condition: service_healthy
+    networks:
+      - redxt-dev
+
+  redxt-dev-cache:
+    image: valkey/valkey:alpine
+    container_name: redxt-dev-cache
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    volumes:
+      - ./volumes/data/db/valkey:/data:z
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - redxt-dev
+
+networks:
+  redxt-dev:
+    name: redxt-dev
+    external: false

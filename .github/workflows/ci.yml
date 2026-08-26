@@ -85,8 +85,8 @@ jobs:
           fail=0
           for f in .github/workflows/*.yml; do
             [ -f "$f" ] || continue
-            if grep -q 'pull_request_target' "$f"; then
-              echo "::error file=$f::pull_request_target is not permitted"
+            if grep -qE '^[[:space:]]*pull_request_target[[:space:]]*:' "$f"; then
+              echo "::error file=$f::pull_request_target trigger is not permitted"
               fail=1
             fi
             while IFS= read -r line; do

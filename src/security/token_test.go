@@ -308,7 +308,9 @@ func TestHashToken(t *testing.T) {
 
 func TestHashTokenIsStable(t *testing.T) {
 	token := PrefixAdmin + fixedRandom
-	if HashToken(token) != HashToken(token) {
+	first := HashToken(token)
+	second := HashToken(token)
+	if first != second {
 		t.Fatal("HashToken is not deterministic")
 	}
 	if HashToken(token) == HashToken(PrefixUser+fixedRandom) {

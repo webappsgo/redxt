@@ -43,6 +43,19 @@ var LogLevels = []string{"debug", "info", "warn", "error"}
 // SMTPTLSModes lists the accepted SMTP transport security modes.
 var SMTPTLSModes = []string{"auto", "starttls", "tls", "none"}
 
+// AccountModes lists the accepted values for user registration and
+// organization creation, per AI.md PART 34 and PART 35.
+var AccountModes = []string{"open", "invite", "admin_only", "disabled"}
+
+// ProfileVisibilities lists the accepted values for a user or
+// organization profile's visibility.
+var ProfileVisibilities = []string{VisibilityPublic, VisibilityPrivate}
+
+// OrgRoles lists the organization member roles, most privileged first.
+// AI.md PART 35 defines a generic three-tier set; IDEA.md refines the
+// third tier into editor and viewer for redxt's DNS permission table.
+var OrgRoles = []string{"owner", "admin", "editor", "viewer"}
+
 // DurationUnits lists the suffixes accepted by a duration setting.
 var DurationUnits = []string{"s", "m", "h", "d"}
 

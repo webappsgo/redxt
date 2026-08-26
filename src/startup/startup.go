@@ -305,6 +305,21 @@ func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) 
 		s.Log.Warnf("%s", warning)
 	}
 
+	// The at-rest encryption key is provisioned before anything that
+	// stores a recoverable secret opens. It is generated once and kept,
+	// because a key that changed between runs would leave every value
+	// written under the old one unreadable.
+	created, err := config.EnsureEncryptionKey(cfg, security.GenerateEncryptionKey)
+	if err != nil {
+		return nil, s.unwind(err)
+	}
+	if created {
+		if err = cfg.Save(); err != nil {
+			return nil, s.unwind(err)
+		}
+		s.Log.Infof("Generated the server encryption key")
+	}
+
 	// Step 14: rebuild logging from the loaded configuration.
 	if err := s.reconfigureLogging(streams, useColor); err != nil {
 		return nil, s.unwind(err)

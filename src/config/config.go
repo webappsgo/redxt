@@ -76,6 +76,161 @@ type Server struct {
 	Security       Security       `yaml:"security"`
 	Healthz        Healthz        `yaml:"healthz"`
 	Contact        Contact        `yaml:"contact"`
+	Users          Users          `yaml:"users"`
+	Orgs           Orgs           `yaml:"orgs"`
+	Features       Features       `yaml:"features"`
+}
+
+// Users holds server.users.* per AI.md PART 34 "Multi-User".
+type Users struct {
+	// Enabled turns the Regular User subsystem on. Regular Users are
+	// end users; they are never Server Admins and live in their own
+	// tables.
+	Enabled bool `yaml:"enabled"`
+
+	Registration Registration `yaml:"registration"`
+	Auth         UserAuth     `yaml:"auth"`
+	Tokens       UserTokens   `yaml:"tokens"`
+	Profile      UserProfile  `yaml:"profile"`
+}
+
+// Registration holds server.users.registration.* per PART 34.
+type Registration struct {
+	// Mode is open, invite, admin_only, or disabled. redxt defaults to
+	// invite per IDEA.md, which overrides the spec-wide default of open.
+	Mode string `yaml:"mode"`
+	// RequireEmailVerification withholds a usable account until the
+	// address is confirmed.
+	RequireEmailVerification bool `yaml:"require_email_verification"`
+	// AllowedDomains restricts signup to these email domains. An empty
+	// list allows every domain that is not blocked.
+	AllowedDomains []string `yaml:"allowed_domains"`
+	// BlockedDomains refuses signup from these email domains.
+	BlockedDomains []string `yaml:"blocked_domains"`
+	// InviteExpirationDays is how long an issued invite stays redeemable.
+	InviteExpirationDays int `yaml:"invite_expiration_days"`
+}
+
+// UserAuth holds server.users.auth.* per PART 34.
+type UserAuth struct {
+	// SessionDuration is the absolute lifetime of a user session.
+	SessionDuration Duration `yaml:"session_duration"`
+	// Allow2FA lets a user enroll a second factor.
+	Allow2FA bool `yaml:"allow_2fa"`
+	// Require2FA refuses a session until a second factor is enrolled.
+	Require2FA bool `yaml:"require_2fa"`
+	// PasswordMinLength is the shortest accepted password.
+	PasswordMinLength int `yaml:"password_min_length"`
+	// PasswordRequireUppercase demands an uppercase letter.
+	PasswordRequireUppercase bool `yaml:"password_require_uppercase"`
+	// PasswordRequireLowercase demands a lowercase letter.
+	PasswordRequireLowercase bool `yaml:"password_require_lowercase"`
+	// PasswordRequireNumber demands a digit.
+	PasswordRequireNumber bool `yaml:"password_require_number"`
+	// PasswordRequireSpecial demands a non-alphanumeric character.
+	PasswordRequireSpecial bool `yaml:"password_require_special"`
+	// MaxFailedLogins is how many wrong passwords lock an account.
+	MaxFailedLogins int `yaml:"max_failed_logins"`
+	// LockoutDuration is how long a locked account stays locked.
+	LockoutDuration Duration `yaml:"lockout_duration"`
+}
+
+// UserTokens holds server.users.tokens.* per PART 34.
+type UserTokens struct {
+	// Enabled lets a user mint personal API tokens.
+	Enabled bool `yaml:"enabled"`
+	// MaxPerUser caps how many live tokens one user may hold.
+	MaxPerUser int `yaml:"max_per_user"`
+	// ExpirationDays is the default token lifetime. Zero means the
+	// token does not expire on its own.
+	ExpirationDays int `yaml:"expiration_days"`
+}
+
+// UserProfile holds server.users.profile.* per PART 34.
+type UserProfile struct {
+	// DefaultVisibility is public or private for a new account.
+	DefaultVisibility string `yaml:"default_visibility"`
+	// AllowBio lets a user publish a biography.
+	AllowBio bool `yaml:"allow_bio"`
+	// AllowWebsite lets a user publish a website link.
+	AllowWebsite bool `yaml:"allow_website"`
+	// AllowLocation lets a user publish a location.
+	AllowLocation bool `yaml:"allow_location"`
+	// AllowAvatar lets a user publish an avatar URL.
+	AllowAvatar bool `yaml:"allow_avatar"`
+}
+
+// Orgs holds server.orgs.* per AI.md PART 35 "Organizations".
+type Orgs struct {
+	// Enabled turns organizations on. PART 35 requires PART 34, so this
+	// has no effect while users are disabled.
+	Enabled bool `yaml:"enabled"`
+
+	Creation OrgCreation `yaml:"creation"`
+	Profile  OrgProfile  `yaml:"profile"`
+	Members  OrgMembers  `yaml:"members"`
+}
+
+// OrgCreation holds server.orgs.creation.* per PART 35.
+type OrgCreation struct {
+	// Mode is open, invite, admin_only, or disabled.
+	Mode string `yaml:"mode"`
+	// MaxPerUser caps how many organizations one user may own. Zero
+	// means unlimited. The personal organization does not count.
+	MaxPerUser int `yaml:"max_per_user"`
+}
+
+// OrgProfile holds server.orgs.profile.* per PART 35.
+type OrgProfile struct {
+	// DefaultVisibility is public or private for a new organization.
+	DefaultVisibility string `yaml:"default_visibility"`
+}
+
+// OrgMembers holds server.orgs.members.* per PART 35.
+type OrgMembers struct {
+	// DefaultRole is the role a new member receives.
+	DefaultRole string `yaml:"default_role"`
+	// AllowInvites lets a member below admin invite others.
+	AllowInvites bool `yaml:"allow_invites"`
+	// Require2FA refuses membership to an account without a second
+	// factor enrolled.
+	Require2FA bool `yaml:"require_2fa"`
+}
+
+// Features holds server.features.* — the optional subsystems that are
+// switched on per deployment rather than per request.
+type Features struct {
+	CustomDomains CustomDomains `yaml:"custom_domains"`
+}
+
+// CustomDomains holds server.features.custom_domains.* per AI.md PART 36.
+type CustomDomains struct {
+	// Enabled turns custom domain support on.
+	Enabled bool `yaml:"enabled"`
+	// MaxDomainsPerUser caps how many domains one user may hold in their
+	// personal organization. Zero means unlimited.
+	MaxDomainsPerUser int `yaml:"max_domains_per_user"`
+	// MaxDomainsPerOrg caps how many domains one shared organization may
+	// hold. Zero means unlimited.
+	MaxDomainsPerOrg int `yaml:"max_domains_per_org"`
+	// RequireSSL refuses to activate a domain without a certificate.
+	RequireSSL bool `yaml:"require_ssl"`
+	// AllowApex permits a registrable apex such as example.com.
+	AllowApex bool `yaml:"allow_apex"`
+	// AllowSubdomain permits a subdomain such as api.example.com.
+	AllowSubdomain bool `yaml:"allow_subdomain"`
+	// AllowWildcard permits a wildcard such as *.example.com. A
+	// wildcard needs a DNS-01 challenge, so it is off by default.
+	AllowWildcard bool `yaml:"allow_wildcard"`
+	// VerificationTTL is how long an issued verification token stays
+	// valid before it must be reissued.
+	VerificationTTL Duration `yaml:"verification_ttl"`
+	// SSLRenewalDays renews a certificate this many days before expiry.
+	SSLRenewalDays int `yaml:"ssl_renewal_days"`
+	// Reserved lists domains that can never be claimed.
+	Reserved []string `yaml:"reserved"`
+	// BlockedPatterns lists regular expressions a domain must not match.
+	BlockedPatterns []string `yaml:"blocked_patterns"`
 }
 
 // SSL holds server.ssl.* per AI.md PART 15 "SSL/TLS & Let's Encrypt".

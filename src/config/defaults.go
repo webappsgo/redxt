@@ -22,6 +22,49 @@ const (
 // the Strict-Transport-Security header.
 const DefaultHSTSMaxAge = 63072000
 
+// Registration and organization creation modes. AI.md PART 34 lists open
+// as the spec-wide default; IDEA.md sets redxt to invite, and a project
+// decision in IDEA.md outranks the generic spec default.
+const (
+	DefaultRegistrationMode = "invite"
+	DefaultOrgCreationMode  = "open"
+)
+
+// Regular User account defaults per AI.md PART 34.
+const (
+	DefaultInviteExpirationDays = 7
+	DefaultPasswordMinLength    = 8
+	DefaultMaxFailedLogins      = 5
+	DefaultMaxTokensPerUser     = 10
+	DefaultTokenExpirationDays  = 90
+)
+
+// DefaultOrgMemberRole is the role a newly added organization member
+// receives. IDEA.md makes viewer the least-privilege starting point.
+const DefaultOrgMemberRole = "viewer"
+
+// Profile visibility values shared by user and organization profiles.
+const (
+	VisibilityPublic  = "public"
+	VisibilityPrivate = "private"
+)
+
+// DefaultReservedDomains lists the custom domains AI.md PART 36 refuses
+// to let anyone claim.
+var DefaultReservedDomains = []string{
+	"localhost",
+	"*.local",
+	"*.test",
+	"*.example",
+	"*.invalid",
+}
+
+// DefaultBlockedDomainPatterns lists the regular expressions a custom
+// domain must not match, per AI.md PART 36.
+var DefaultBlockedDomainPatterns = []string{
+	`.*\.(gov|mil|edu)$`,
+}
+
 // DefaultCSRFExemptPaths lists the route prefixes that never carry a
 // browser session cookie and therefore never need a CSRF token.
 var DefaultCSRFExemptPaths = []string{
@@ -216,6 +259,67 @@ func DefaultConfig() *Config {
 			Healthz: Healthz{
 				Root: HealthzRoot{
 					Enabled: false,
+				},
+			},
+
+			Users: Users{
+				Enabled: true,
+				Registration: Registration{
+					Mode:                     DefaultRegistrationMode,
+					RequireEmailVerification: true,
+					InviteExpirationDays:     DefaultInviteExpirationDays,
+				},
+				Auth: UserAuth{
+					SessionDuration:          Duration(7 * 24 * time.Hour),
+					Allow2FA:                 true,
+					PasswordMinLength:        DefaultPasswordMinLength,
+					PasswordRequireUppercase: true,
+					PasswordRequireLowercase: true,
+					PasswordRequireNumber:    true,
+					MaxFailedLogins:          DefaultMaxFailedLogins,
+					LockoutDuration:          Duration(15 * time.Minute),
+				},
+				Tokens: UserTokens{
+					Enabled:        true,
+					MaxPerUser:     DefaultMaxTokensPerUser,
+					ExpirationDays: DefaultTokenExpirationDays,
+				},
+				Profile: UserProfile{
+					DefaultVisibility: VisibilityPublic,
+					AllowBio:          true,
+					AllowWebsite:      true,
+					AllowLocation:     true,
+					AllowAvatar:       true,
+				},
+			},
+
+			Orgs: Orgs{
+				Enabled: true,
+				Creation: OrgCreation{
+					Mode: DefaultOrgCreationMode,
+				},
+				Profile: OrgProfile{
+					DefaultVisibility: VisibilityPublic,
+				},
+				Members: OrgMembers{
+					DefaultRole:  DefaultOrgMemberRole,
+					AllowInvites: true,
+				},
+			},
+
+			Features: Features{
+				CustomDomains: CustomDomains{
+					Enabled:           false,
+					MaxDomainsPerUser: 5,
+					MaxDomainsPerOrg:  20,
+					RequireSSL:        true,
+					AllowApex:         true,
+					AllowSubdomain:    true,
+					AllowWildcard:     false,
+					VerificationTTL:   Duration(24 * time.Hour),
+					SSLRenewalDays:    7,
+					Reserved:          append([]string(nil), DefaultReservedDomains...),
+					BlockedPatterns:   append([]string(nil), DefaultBlockedDomainPatterns...),
 				},
 			},
 		},

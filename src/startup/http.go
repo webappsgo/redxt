@@ -10,6 +10,7 @@ import (
 	"github.com/webappsgo/redxt/src/health"
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/server"
+	"github.com/webappsgo/redxt/src/server/handler"
 	"github.com/webappsgo/redxt/src/server/middleware"
 	"github.com/webappsgo/redxt/src/ssl"
 	"github.com/webappsgo/redxt/src/urlvars"
@@ -39,13 +40,19 @@ func (s *Server) startHTTP(ctx context.Context) error {
 		return err
 	}
 
+	users, err := s.openUsers()
+	if err != nil {
+		return err
+	}
+
 	httpServer, err := server.New(server.Options{
 		Config:       s.Config,
 		Paths:        s.Paths,
 		Log:          s.Log,
 		Mode:         string(s.Mode.Mode),
 		Debug:        s.Mode.Debug,
-		Middleware:   s.middleware(),
+		Routes:       userRoutes(users),
+		Middleware:   s.middleware(users),
 		TLS:          s.tlsProvider(),
 		HealthProbe:  s.healthProbe,
 		TrustedProxy: middleware.TrustedProxyFunc(s.URLVars),
@@ -85,14 +92,37 @@ func (s *Server) newResolver() *urlvars.Resolver {
 // stages the defaults cannot fill in are supplied here because only the
 // startup sequence holds them: the rate limiter's window store lives in
 // server.db, and the access log writes through the configured logger.
-func (s *Server) middleware() func(http.Handler) http.Handler {
+// The Regular User handler supplies the third: it is the only component
+// that can turn a credential into an identity, and without it the Auth
+// stage authenticates nothing and every handler guards itself.
+func (s *Server) middleware(users *handler.Handler) func(http.Handler) http.Handler {
 	opts := middleware.DefaultOptions(s.Config, s.URLVars)
 	opts.RateLimit.Store = middleware.NewSQLStore(s.ServerDB.DB, 0)
 	opts.RateLimit.OnError = func(_ *http.Request, err error) {
 		s.Log.Errorf("Rate limit store: %v", err)
 	}
 	opts.Logging.Sink = s.Log.Access
+
+	if users != nil {
+		opts.Auth.Verifier = handler.NewVerifier(users.Service(), users.SessionCookieName())
+		opts.Auth.IsPublicPath = users.IsPublicPath
+	}
+
 	return middleware.New(opts)
+}
+
+// userRoutes places the Regular User surfaces in the router's route
+// table. A disabled subsystem contributes no entries at all.
+func userRoutes(users *handler.Handler) server.Routes {
+	if users == nil {
+		return server.Routes{}
+	}
+	return server.Routes{
+		Users:            users.Web(),
+		UsersPrefixes:    users.WebPrefixes(),
+		UsersAPI:         users.API(),
+		UsersAPIPrefixes: users.APIPrefixes(),
+	}
 }
 
 // openTLS builds the certificate manager when the configuration asks for

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -23,7 +24,14 @@ var (
 	validSecure          = []string{"auto", "true", "false"}
 	validTLSVersions     = []string{"TLS1.2", "TLS1.3"}
 	validACMEChallenges  = []string{"http-01", "tls-alpn-01", "dns-01"}
+	validAccountModes    = AccountModes
+	validVisibilities    = ProfileVisibilities
+	validOrgRoles        = OrgRoles
 )
+
+// MinPasswordLength is the shortest password AI.md PART 34 permits a
+// deployment to configure.
+const MinPasswordLength = 8
 
 // Validate checks every configuration value, replacing anything
 // invalid with its documented default and recording a warning.
@@ -48,6 +56,9 @@ func (c *Config) Validate() bool {
 	c.validateTrustedProxies()
 	c.validateSSL(def)
 	c.validateWeb(def)
+	c.validateUsers(def)
+	c.validateOrgs(def)
+	c.validateCustomDomains(def)
 
 	return len(c.warnings) != before
 }
@@ -213,6 +224,172 @@ func containsFold(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// validateUsers checks the Regular User subsystem settings from AI.md
+// PART 34.
+func (c *Config) validateUsers(def *Config) {
+	u := &c.Server.Users
+	d := def.Server.Users
+
+	if !containsFold(validAccountModes, u.Registration.Mode) {
+		c.warnf("invalid server.users.registration.mode %q, using %q", u.Registration.Mode, d.Registration.Mode)
+		u.Registration.Mode = d.Registration.Mode
+	}
+	u.Registration.Mode = strings.ToLower(strings.TrimSpace(u.Registration.Mode))
+
+	if u.Registration.InviteExpirationDays <= 0 {
+		c.warnf("invalid server.users.registration.invite_expiration_days %d, using %d", u.Registration.InviteExpirationDays, d.Registration.InviteExpirationDays)
+		u.Registration.InviteExpirationDays = d.Registration.InviteExpirationDays
+	}
+
+	u.Registration.AllowedDomains = normalizeDomainList(u.Registration.AllowedDomains)
+	u.Registration.BlockedDomains = normalizeDomainList(u.Registration.BlockedDomains)
+
+	c.requirePositiveDuration(&u.Auth.SessionDuration, d.Auth.SessionDuration, "server.users.auth.session_duration")
+	c.requirePositiveDuration(&u.Auth.LockoutDuration, d.Auth.LockoutDuration, "server.users.auth.lockout_duration")
+
+	if u.Auth.PasswordMinLength < MinPasswordLength {
+		c.warnf("invalid server.users.auth.password_min_length %d, using %d", u.Auth.PasswordMinLength, d.Auth.PasswordMinLength)
+		u.Auth.PasswordMinLength = d.Auth.PasswordMinLength
+	}
+
+	if u.Auth.MaxFailedLogins <= 0 {
+		c.warnf("invalid server.users.auth.max_failed_logins %d, using %d", u.Auth.MaxFailedLogins, d.Auth.MaxFailedLogins)
+		u.Auth.MaxFailedLogins = d.Auth.MaxFailedLogins
+	}
+
+	if u.Auth.Require2FA && !u.Auth.Allow2FA {
+		c.warnf("server.users.auth.require_2fa is set while allow_2fa is not, enabling allow_2fa")
+		u.Auth.Allow2FA = true
+	}
+
+	if u.Tokens.MaxPerUser < 0 {
+		c.warnf("invalid server.users.tokens.max_per_user %d, using %d", u.Tokens.MaxPerUser, d.Tokens.MaxPerUser)
+		u.Tokens.MaxPerUser = d.Tokens.MaxPerUser
+	}
+
+	if u.Tokens.ExpirationDays < 0 {
+		c.warnf("invalid server.users.tokens.expiration_days %d, using %d", u.Tokens.ExpirationDays, d.Tokens.ExpirationDays)
+		u.Tokens.ExpirationDays = d.Tokens.ExpirationDays
+	}
+
+	if !containsFold(validVisibilities, u.Profile.DefaultVisibility) {
+		c.warnf("invalid server.users.profile.default_visibility %q, using %q", u.Profile.DefaultVisibility, d.Profile.DefaultVisibility)
+		u.Profile.DefaultVisibility = d.Profile.DefaultVisibility
+	}
+	u.Profile.DefaultVisibility = strings.ToLower(strings.TrimSpace(u.Profile.DefaultVisibility))
+}
+
+// validateOrgs checks the organization settings from AI.md PART 35.
+// Organizations build on Regular Users, so the section is forced off
+// when users are disabled.
+func (c *Config) validateOrgs(def *Config) {
+	o := &c.Server.Orgs
+	d := def.Server.Orgs
+
+	if o.Enabled && !c.Server.Users.Enabled {
+		c.warnf("server.orgs.enabled requires server.users.enabled, disabling organizations")
+		o.Enabled = false
+	}
+
+	if !containsFold(validAccountModes, o.Creation.Mode) {
+		c.warnf("invalid server.orgs.creation.mode %q, using %q", o.Creation.Mode, d.Creation.Mode)
+		o.Creation.Mode = d.Creation.Mode
+	}
+	o.Creation.Mode = strings.ToLower(strings.TrimSpace(o.Creation.Mode))
+
+	if o.Creation.MaxPerUser < 0 {
+		c.warnf("invalid server.orgs.creation.max_per_user %d, using %d", o.Creation.MaxPerUser, d.Creation.MaxPerUser)
+		o.Creation.MaxPerUser = d.Creation.MaxPerUser
+	}
+
+	if !containsFold(validVisibilities, o.Profile.DefaultVisibility) {
+		c.warnf("invalid server.orgs.profile.default_visibility %q, using %q", o.Profile.DefaultVisibility, d.Profile.DefaultVisibility)
+		o.Profile.DefaultVisibility = d.Profile.DefaultVisibility
+	}
+	o.Profile.DefaultVisibility = strings.ToLower(strings.TrimSpace(o.Profile.DefaultVisibility))
+
+	if !containsFold(validOrgRoles, o.Members.DefaultRole) {
+		c.warnf("invalid server.orgs.members.default_role %q, using %q", o.Members.DefaultRole, d.Members.DefaultRole)
+		o.Members.DefaultRole = d.Members.DefaultRole
+	}
+	o.Members.DefaultRole = strings.ToLower(strings.TrimSpace(o.Members.DefaultRole))
+
+	// An owner is created with the organization, so it can never be the
+	// role handed to somebody joining an existing organization.
+	if o.Members.DefaultRole == "owner" {
+		c.warnf("server.orgs.members.default_role cannot be owner, using %q", d.Members.DefaultRole)
+		o.Members.DefaultRole = d.Members.DefaultRole
+	}
+}
+
+// validateCustomDomains checks the custom domain settings from AI.md
+// PART 36. Custom domains are org-scoped, so the section is forced off
+// when organizations are disabled.
+func (c *Config) validateCustomDomains(def *Config) {
+	cd := &c.Server.Features.CustomDomains
+	d := def.Server.Features.CustomDomains
+
+	if cd.Enabled && !c.Server.Orgs.Enabled {
+		c.warnf("server.features.custom_domains.enabled requires server.orgs.enabled, disabling custom domains")
+		cd.Enabled = false
+	}
+
+	if cd.MaxDomainsPerUser < 0 {
+		c.warnf("invalid server.features.custom_domains.max_domains_per_user %d, using %d", cd.MaxDomainsPerUser, d.MaxDomainsPerUser)
+		cd.MaxDomainsPerUser = d.MaxDomainsPerUser
+	}
+
+	if cd.MaxDomainsPerOrg < 0 {
+		c.warnf("invalid server.features.custom_domains.max_domains_per_org %d, using %d", cd.MaxDomainsPerOrg, d.MaxDomainsPerOrg)
+		cd.MaxDomainsPerOrg = d.MaxDomainsPerOrg
+	}
+
+	if !cd.AllowApex && !cd.AllowSubdomain && !cd.AllowWildcard {
+		c.warnf("server.features.custom_domains allows no domain shape, re-enabling apex and subdomain")
+		cd.AllowApex = true
+		cd.AllowSubdomain = true
+	}
+
+	c.requirePositiveDuration(&cd.VerificationTTL, d.VerificationTTL, "server.features.custom_domains.verification_ttl")
+
+	if cd.SSLRenewalDays <= 0 {
+		c.warnf("invalid server.features.custom_domains.ssl_renewal_days %d, using %d", cd.SSLRenewalDays, d.SSLRenewalDays)
+		cd.SSLRenewalDays = d.SSLRenewalDays
+	}
+
+	cd.Reserved = normalizeDomainList(cd.Reserved)
+
+	// A pattern that does not compile would silently accept every domain
+	// it was meant to block, so it is dropped with a warning instead.
+	patterns := make([]string, 0, len(cd.BlockedPatterns))
+	for _, p := range cd.BlockedPatterns {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, err := regexp.Compile(p); err != nil {
+			c.warnf("invalid server.features.custom_domains.blocked_patterns entry %q, dropping it", p)
+			continue
+		}
+		patterns = append(patterns, p)
+	}
+	cd.BlockedPatterns = patterns
+}
+
+// normalizeDomainList lowercases, trims, and drops empty entries from a
+// configured list of domains.
+func normalizeDomainList(list []string) []string {
+	out := make([]string, 0, len(list))
+	for _, entry := range list {
+		entry = strings.ToLower(strings.TrimSpace(entry))
+		if entry == "" {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
 }
 
 // validateLimits checks the request size and timeout limits.

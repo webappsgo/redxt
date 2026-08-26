@@ -165,3 +165,38 @@ Read: AI.md PART 31
 
 ## [ ] Implement overlay networks (Tor & I2P)
 Read: AI.md PART 32
+
+## [ ] Reconcile PART 36 custom-domain routes with the spec tables
+Read: AI.md PART 36 (route tables, approx. lines 62775-62849)
+The implemented org-scoped domain tree differs from the spec's tables in
+five ways. Each is a deliberate, recorded decision, not an oversight:
+- Domains are addressed by `{domain_id}`; the spec addresses them by
+  `{domain}` name. An opaque id keeps a tenant-owned name out of the path.
+- The ownership-challenge route is `/verification`; the spec names it
+  `/dns`. Decide which wins before the route is public.
+- `GET /ssl`, `POST /ssl`, and `POST /ssl/renew` are not implemented.
+  Issuance currently happens as a consequence of successful verification
+  through the PART 15 ACME manager, with no separate certificate routes.
+- The spec's parallel `/users/domains/...` user-scope tree is absent. A
+  domain always belongs to an organization; a single user reaches theirs
+  through their personal organization.
+- `/suspend` lives in the org tree and there is no `/unsuspend`; the spec
+  places both in the admin tree. Unsuspend has no route at all today.
+
+## [ ] Implement the GDPR data routes
+Read: AI.md lines 17491-17495
+`/users/data/export`, `/users/data/delete`, and `/users/consents` are
+specified but not built. They are absent rather than stubbed, so nothing
+answers on those paths today.
+
+## [ ] Implement external identity providers
+Read: AI.md PART 34
+OIDC, LDAP, SAML, and passkey/WebAuthn sign-in are not built. Local
+Argon2id credentials and TOTP are the only authentication methods.
+
+## [ ] Implement DNS credential types on the token scope column
+Read: AI.md PART 34, PART 35
+The token table already carries `scope`, `zone_id`, and `capability`
+columns so TSIG, GSS-TSIG, DDNS, and agent credentials can attach to a
+zone later without a migration. No such credential type exists yet, and
+no code path issues or accepts one.

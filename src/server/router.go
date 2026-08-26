@@ -42,6 +42,16 @@ type Routes struct {
 	// ACME serves the HTTP-01 challenge tree (PART 15). When nil, the
 	// router falls back to the TLS provider's own challenge handler.
 	ACME http.Handler
+	// Users serves the server-rendered Regular User, organization and
+	// custom-domain pages (PART 34, 35, 36).
+	Users http.Handler
+	// UsersPrefixes are the patterns Users is mounted on. The handler
+	// routes the full path itself, so nothing is stripped here.
+	UsersPrefixes []string
+	// UsersAPI serves the versioned REST surface for the same PARTs.
+	UsersAPI http.Handler
+	// UsersAPIPrefixes are the patterns UsersAPI is mounted on.
+	UsersAPIPrefixes []string
 }
 
 // NewRouter builds the complete route tree from the endpoint table in
@@ -110,6 +120,16 @@ func NewRouter(o Options) *http.ServeMux {
 		mux.Handle(api+"/server/"+adminSegment+"/", routes.AdminAPI)
 	}
 
+	// The Regular User surfaces (PART 34, 35, 36). Both are mounted on
+	// prefixes their own handler resolves, which keeps the route table
+	// for those PARTs in one place instead of split across two files.
+	if routes.Users != nil {
+		mountPrefixes(mux, routes.Users, routes.UsersPrefixes)
+	}
+	if routes.UsersAPI != nil {
+		mountPrefixes(mux, routes.UsersAPI, routes.UsersAPIPrefixes)
+	}
+
 	// The API surface. Each alias shares the handler value with the
 	// versioned path it aliases.
 	mux.Handle("GET /api/autodiscover", routes.Autodiscover)
@@ -139,6 +159,17 @@ func NewRouter(o Options) *http.ServeMux {
 func mount(mux *http.ServeMux, method string, h http.Handler, patterns ...string) {
 	for _, p := range patterns {
 		mux.Handle(method+" "+p, h)
+	}
+}
+
+// mountPrefixes registers one handler under several path prefixes for
+// every method, leaving method routing to the handler itself.
+func mountPrefixes(mux *http.ServeMux, h http.Handler, patterns []string) {
+	for _, p := range patterns {
+		if p == "" {
+			continue
+		}
+		mux.Handle(p, h)
 	}
 }
 

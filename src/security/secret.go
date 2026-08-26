@@ -22,6 +22,10 @@ const (
 	// SecretCSRF is the app_secrets row name of the HMAC base for CSRF
 	// tokens.
 	SecretCSRF = "csrf_token_secret"
+	// SecretSetupToken is the app_secrets row name under which the hash
+	// of the one-time first-run admin setup token is stored. Only the
+	// hash is persisted; the plaintext is shown once on the console.
+	SecretSetupToken = "setup_token_hash"
 )
 
 // SecretLength is the required length in bytes (256 bits) of every

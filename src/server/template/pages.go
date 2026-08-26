@@ -621,4 +621,34 @@ td, th { border-bottom: 1px solid var(--line); padding: 0.35rem 0.5rem; text-ali
 {{if .Data.Location}}<p>{{.Data.Location}}</p>{{end}}
 {{if .Data.Website}}<p><a href="{{.Data.Website}}" rel="nofollow noopener">{{.Data.Website}}</a></p>{{end}}
 {{template "foot" .}}{{end}}
+
+{{define "adminsetup"}}{{template "head" .}}
+<h2>Set up the administrator account</h2>
+<p class="muted">This runs once. The token below was printed to the console on first run.</p>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+  <label>Setup token
+    <input type="text" name="token" value="{{.Data.Token}}" required>
+  </label>
+  <label>Username
+    <input type="text" name="username" autocomplete="username" required>
+  </label>
+  <label>Email
+    <input type="email" name="email" autocomplete="email" required>
+  </label>
+  <label>Password
+    <input type="password" name="password" autocomplete="new-password" required>
+  </label>
+  <button type="submit">Create administrator account</button>
+</form>
+{{template "foot" .}}{{end}}
+
+{{define "admindashboard"}}{{template "head" .}}
+<h2>Administration</h2>
+<p>Signed in as {{.Data.Admin.Username}}.</p>
+<form method="post" action="logout">
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+  <button type="submit">Sign out</button>
+</form>
+{{template "foot" .}}{{end}}
 `

@@ -29,6 +29,24 @@ var usersCoreTables = []string{
 		updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`,
 
+	// admin_sessions holds the Server Admin web sessions (PART 17). It lives
+	// alongside admins in users.db rather than in server.db, since a session
+	// cannot outlive the account it authenticates and the two are always
+	// read together. The session id is stored hashed for the same reason
+	// tokens are: a database read must not yield a usable credential.
+	`CREATE TABLE IF NOT EXISTS admin_sessions (
+		id              INTEGER PRIMARY KEY,
+		session_hash    TEXT NOT NULL UNIQUE,
+		admin_id        INTEGER NOT NULL,
+		ip_address      TEXT NOT NULL DEFAULT '',
+		user_agent      TEXT NOT NULL DEFAULT '',
+		two_factor_ok   INTEGER NOT NULL DEFAULT 0,
+		created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_active_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		expires_at      TIMESTAMP NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)`,
+
 	// users holds the regular end-user accounts (PART 34). password_hash is
 	// an Argon2id encoded string, as for admins. locked_until drives the
 	// brute-force lockout; failed_logins is the counter behind it.

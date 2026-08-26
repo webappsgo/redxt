@@ -2,6 +2,7 @@ package startup
 
 import (
 	"github.com/webappsgo/redxt/src/security"
+	"github.com/webappsgo/redxt/src/server/admin"
 	"github.com/webappsgo/redxt/src/server/handler"
 	"github.com/webappsgo/redxt/src/server/middleware"
 	"github.com/webappsgo/redxt/src/server/service"
@@ -16,7 +17,11 @@ import (
 // mounts none of its routes and installs none of its credential
 // verification: a disabled subsystem is absent from the running server
 // rather than present and refusing.
-func (s *Server) openUsers() (*handler.Handler, error) {
+//
+// adminSvc backs the admin sign-in check the shared /server/auth/login
+// form also performs (PART 17); a nil value simply leaves that fallback
+// disabled.
+func (s *Server) openUsers(adminSvc *admin.Service) (*handler.Handler, error) {
 	if !s.Config.Server.Users.Enabled || s.UsersDB == nil {
 		return nil, nil
 	}
@@ -49,9 +54,10 @@ func (s *Server) openUsers() (*handler.Handler, error) {
 	}
 
 	return handler.New(handler.Options{
-		Service:   svc,
-		Config:    s.Config,
-		Templates: pages,
-		ClientIP:  middleware.ClientIPFunc(s.URLVars),
+		Service:      svc,
+		Config:       s.Config,
+		Templates:    pages,
+		ClientIP:     middleware.ClientIPFunc(s.URLVars),
+		AdminService: adminSvc,
 	})
 }

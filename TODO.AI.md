@@ -78,12 +78,15 @@ and `ssl.NextRenewalCheck` exist and are tested; nothing calls them yet because
 the scheduler is PART 19. Wire the job when PART 19 lands.
 Read: AI.md PART 15, PART 19
 
-## [ ] Mount the metrics, swagger, GraphQL, and admin handlers on the router
+## [ ] Mount the metrics, swagger, and GraphQL handlers on the router
 `server.Routes` has a field per surface and the router mounts every documented
 path (including the unversioned aliases) the moment a field is non-nil. The
-fields are left nil until PARTs 17 and 21 supply the handlers, so those routes
-answer 404 rather than an empty success.
-Read: AI.md PART 14, PART 17, PART 21
+metrics/swagger/GraphQL fields are left nil until PART 21 supplies those
+handlers, so those routes answer 404 rather than an empty success. The admin
+field is now supplied (`startup/admin.go` builds `admin.Handler`, wired via
+`mergeAdminRoutes` in `startup/http.go`) — see "Implement admin panel" below
+for what that handler does and does not yet cover.
+Read: AI.md PART 14, PART 21
 
 ## [ ] Add the `server.metrics.root.enabled` config key
 The router mounts the root `/metrics` alias unconditionally when a metrics
@@ -100,25 +103,41 @@ Read: AI.md PART 23, PART 33
 
 ## Accounts, orgs, and domains — route to go-auth-builder
 
-## [ ] Implement multi-user (registration modes, MFA, roles, tokens per IDEA.md Roles & permissions table)
+## [x] Implement multi-user (registration modes, MFA, roles, tokens per IDEA.md Roles & permissions table)
 Read: AI.md PART 34
 Builder: go-auth-builder
 
-## [ ] Implement organizations (personal + shared orgs, owner/role permissions, per-zone isolation)
+## [x] Implement organizations (personal + shared orgs, owner/role permissions, per-zone isolation)
 Read: AI.md PART 35
 Builder: go-auth-builder
 
-## [ ] Implement custom domains (white-labeling, org-scoped custom vhosts)
+## [x] Implement custom domains (white-labeling, org-scoped custom vhosts)
 Read: AI.md PART 36
 Builder: go-auth-builder
 
 ## Frontend and admin
 
-## [ ] Implement web frontend
+## [x] Implement web frontend
 Read: AI.md PART 16
 
 ## [ ] Implement admin panel
 Read: AI.md PART 17
+`src/server/admin` (service, store, model from an earlier pass; handler.go
+added this pass) plus `src/server/handler/web.go`'s shared-login fallback now
+cover the panel's entry points: the first-run setup wizard
+(`GET/POST {admin_path}/config/setup`), the isolation-rule landing dashboard
+(`GET {admin_path}/`), and logout (`POST {admin_path}/logout`). Sign-in itself
+deliberately has no separate admin route — PART 17 requires the same shared
+`/server/auth/login` form Regular Users use, with no admin-specific hint, so
+`webLogin` tries the Regular User service first and falls back to
+`admin.Service.Login` on failure.
+Still not implemented — tracked here rather than stubbed, per PART 1:
+- The entire `{admin_path}/config/*` server-management surface: settings,
+  ssl, email, scheduler, logs (+ logs/audit), backup, updates, info, metrics,
+  network (tor, geoip), security (auth incl. oidc/ldap/saml, tokens,
+  firewall), users, orgs, cluster, agents.
+- The `{admin_path}/{admin_username}/*` own-account tree: profile,
+  preferences, notifications.
 
 ## Notifications — route to notifications-builder
 
@@ -200,3 +219,33 @@ The token table already carries `scope`, `zone_id`, and `capability`
 columns so TSIG, GSS-TSIG, DDNS, and agent credentials can attach to a
 zone later without a migration. No such credential type exists yet, and
 no code path issues or accepts one.
+
+## [ ] Raise coverage on packages below the 60% gate
+Read: AI.md PART 29
+As of the PART 16/17 admin-panel pass, `go test ./... -cover` shows several
+pre-existing packages under the required 60% gate:
+`src/server/handler` 30.7%, `src/server/service` 42.9%, `src/server/store`
+40.4%, `src/daemon` 19.1%. None of these regressed this pass — `handler`
+gained two new tests covering the admin-login fallback added this pass
+(`web_admin_test.go`) without materially moving its percentage, since the
+package is large and mostly covers pre-existing PART 34-36 surface. Add
+table-driven tests until each package clears 60%.
+
+## [ ] Add /server/about and /server/help pages sourced from IDEA.md
+Read: AI.md PART 1 ("Create /server/about or /server/help with placeholder
+text" is forbidden — content must come from IDEA.md), AI.md PART 16
+No `about`/`help` route exists yet (`grep` of `src/server/handler` and
+`src/server/router.go` finds neither). Out of scope for the PART 16/17
+admin-panel pass just completed; needs real copy sourced from IDEA.md, not
+placeholder text.
+
+## [ ] Add a workflow_dispatch trigger to ci.yml
+Read: .github/workflows/ci.yml, ci.yml's `on:` block currently only has
+push/pull_request/schedule. After pushing commit c9f910d5fb52 (PART
+34-36), CI never got a run created at all and Docker Build got stuck
+`queued` with zero job records for over an hour — GitHub refused both
+cancel (409 "not queued yet") and delete (403) on the orphaned run.
+Daily Build (which does have workflow_dispatch) was manually dispatched
+as a substitute signal and returned success for the same commit. Adding
+workflow_dispatch to ci.yml would let a missed/stuck push-triggered run
+be manually retried in future without relying on an unrelated workflow.

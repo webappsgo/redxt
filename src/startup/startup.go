@@ -40,12 +40,6 @@ import (
 	"github.com/webappsgo/redxt/src/urlvars"
 )
 
-// setupTokenSecret is the app_secrets name under which the hash of the
-// first-run setup token is stored. Only the hash is persisted; the
-// token itself is shown once on the console and never written to a log
-// file or to the configuration.
-const setupTokenSecret = "setup_token_hash"
-
 // Exit codes. AI.md PART 8 fixes 0 for a clean exit and 1 for a
 // startup failure; 2 is reserved for a command-line error, which the
 // flag package already treats as distinct from a runtime failure.
@@ -415,7 +409,7 @@ func (s *Server) ensureSetupToken(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	stored, _, err := database.EnsureSecret(ctx, s.ServerDB, setupTokenSecret, func() (string, error) {
+	stored, _, err := database.EnsureSecret(ctx, s.ServerDB, security.SecretSetupToken, func() (string, error) {
 		return security.HashToken(token), nil
 	})
 	if err != nil {

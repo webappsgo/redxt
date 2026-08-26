@@ -164,7 +164,7 @@ func TestSetupTokenIsStoredHashedOnly(t *testing.T) {
 		t.Fatalf("setup token = %q, want %d characters", server.SetupToken, security.SetupTokenLength)
 	}
 
-	stored, _, _, err := database.GetSecret(context.Background(), server.ServerDB, setupTokenSecret)
+	stored, _, _, err := database.GetSecret(context.Background(), server.ServerDB, security.SecretSetupToken)
 	if err != nil {
 		t.Fatalf("reading the stored setup token: %v", err)
 	}

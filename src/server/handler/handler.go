@@ -19,6 +19,7 @@ import (
 
 	"github.com/webappsgo/redxt/src/apierror"
 	"github.com/webappsgo/redxt/src/config"
+	"github.com/webappsgo/redxt/src/server/admin"
 	"github.com/webappsgo/redxt/src/server/middleware"
 	"github.com/webappsgo/redxt/src/server/service"
 	"github.com/webappsgo/redxt/src/server/template"
@@ -43,6 +44,10 @@ type Options struct {
 	// trusted-proxy rules. Nil falls back to the transport peer, which is
 	// the correct answer for a server that is not behind a proxy.
 	ClientIP func(*http.Request) string
+	// AdminService backs the PART 17 admin sign-in check the shared
+	// /server/auth/login form also performs. Nil disables admin sign-in
+	// on this surface, leaving the rest of the web surface working.
+	AdminService *admin.Service
 }
 
 // Handler serves both the REST and the server-rendered surfaces.
@@ -51,6 +56,7 @@ type Handler struct {
 	config    *config.Config
 	templates *template.Set
 	clientIP  func(*http.Request) string
+	admin     *admin.Service
 }
 
 // New returns a Handler.
@@ -71,6 +77,7 @@ func New(opts Options) (*Handler, error) {
 		config:    opts.Config,
 		templates: opts.Templates,
 		clientIP:  resolve,
+		admin:     opts.AdminService,
 	}, nil
 }
 

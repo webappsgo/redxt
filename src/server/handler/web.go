@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/webappsgo/redxt/src/security"
+	"github.com/webappsgo/redxt/src/server/admin"
 	"github.com/webappsgo/redxt/src/server/middleware"
 	"github.com/webappsgo/redxt/src/server/model"
 	"github.com/webappsgo/redxt/src/server/service"
@@ -288,32 +289,49 @@ func (h *Handler) webLoginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // webLogin verifies a password and opens a session.
+//
+// The form is shared between Regular Users and the Server Admin per
+// PART 17's isolation rule: the page carries no hint an admin panel
+// exists, so a failed Regular User login is retried against the admin
+// account space before either is reported as a failure.
 func (h *Handler) webLogin(w http.ResponseWriter, r *http.Request) {
 	if err := parseForm(r); err != nil {
 		h.renderErr(w, r, "login", "Sign in", loginData{}, err)
 		return
 	}
 
+	identifier := formValue(r, "identifier")
+	password := r.PostFormValue("password")
+
 	result, err := h.svc.Login(r.Context(), service.LoginInput{
-		Identifier: formValue(r, "identifier"),
-		Password:   r.PostFormValue("password"),
+		Identifier: identifier,
+		Password:   password,
 		IP:         h.clientIP(r),
 		UserAgent:  r.UserAgent(),
 	})
-	if err != nil {
-		mode := h.svc.RegistrationMode()
-		h.renderErr(w, r, "login", "Sign in", loginData{
-			RegistrationOpen: mode.SelfServiceAllowed() || mode.InviteAllowed(),
-		}, err)
+	if err == nil {
+		h.setSession(w, r, result.SessionToken)
+		if result.TwoFactorPending {
+			redirect(w, r, "/server/auth/2fa")
+			return
+		}
+		redirect(w, r, "/users/account")
 		return
 	}
 
-	h.setSession(w, r, result.SessionToken)
-	if result.TwoFactorPending {
-		redirect(w, r, "/server/auth/2fa")
-		return
+	if h.admin != nil {
+		token, _, adminErr := h.admin.Login(r.Context(), identifier, password, h.clientIP(r), r.UserAgent())
+		if adminErr == nil {
+			admin.SetSessionCookie(w, r, h.config, token)
+			redirect(w, r, h.config.AdminBasePath()+"/")
+			return
+		}
 	}
-	redirect(w, r, "/users/account")
+
+	mode := h.svc.RegistrationMode()
+	h.renderErr(w, r, "login", "Sign in", loginData{
+		RegistrationOpen: mode.SelfServiceAllowed() || mode.InviteAllowed(),
+	}, err)
 }
 
 // registerPageData describes the registration form for the current mode.

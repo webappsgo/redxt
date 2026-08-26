@@ -14,6 +14,7 @@ var pageNames = []string{
 	"login", "register", "twofactor", "forgot", "reset", "message",
 	"account", "settings", "security", "secret", "orgs", "org",
 	"domain", "audit", "profile", "orgprofile",
+	"adminsetup", "admindashboard",
 }
 
 // The payload types below mirror the shapes the handler package passes

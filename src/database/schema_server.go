@@ -151,22 +151,6 @@ var serverCoreTables = []string{
 	`CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(token_hash)`,
 	`CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens(owner_type, owner_id)`,
 
-	// admin_sessions holds the server-admin web sessions. The session id is
-	// stored hashed for the same reason tokens are: a database read must not
-	// yield a usable credential.
-	`CREATE TABLE IF NOT EXISTS admin_sessions (
-		id              INTEGER PRIMARY KEY,
-		session_hash    TEXT NOT NULL UNIQUE,
-		admin_id        INTEGER NOT NULL,
-		ip_address      TEXT NOT NULL DEFAULT '',
-		user_agent      TEXT NOT NULL DEFAULT '',
-		two_factor_ok   INTEGER NOT NULL DEFAULT 0,
-		created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		last_active_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		expires_at      TIMESTAMP NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)`,
-
 	// rate_limits holds the per-identifier sliding-window counters. The
 	// identifier is an IP, a login name, or an API token fingerprint; bucket
 	// names the rule class (read, write, health, login, ...). Shared through

@@ -10,6 +10,7 @@ import (
 	"github.com/webappsgo/redxt/src/health"
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/server"
+	"github.com/webappsgo/redxt/src/server/admin"
 	"github.com/webappsgo/redxt/src/server/handler"
 	"github.com/webappsgo/redxt/src/server/middleware"
 	"github.com/webappsgo/redxt/src/ssl"
@@ -40,7 +41,12 @@ func (s *Server) startHTTP(ctx context.Context) error {
 		return err
 	}
 
-	users, err := s.openUsers()
+	adminSvc := s.openAdminService()
+	users, err := s.openUsers(adminSvc)
+	if err != nil {
+		return err
+	}
+	adminHandler, err := s.openAdminHandler(adminSvc, users)
 	if err != nil {
 		return err
 	}
@@ -51,7 +57,7 @@ func (s *Server) startHTTP(ctx context.Context) error {
 		Log:          s.Log,
 		Mode:         string(s.Mode.Mode),
 		Debug:        s.Mode.Debug,
-		Routes:       userRoutes(users),
+		Routes:       mergeAdminRoutes(userRoutes(users), adminHandler),
 		Middleware:   s.middleware(users),
 		TLS:          s.tlsProvider(),
 		HealthProbe:  s.healthProbe,
@@ -123,6 +129,15 @@ func userRoutes(users *handler.Handler) server.Routes {
 		UsersAPI:         users.API(),
 		UsersAPIPrefixes: users.APIPrefixes(),
 	}
+}
+
+// mergeAdminRoutes adds the admin panel (PART 17) to an existing route
+// table. A disabled panel (no databases open) contributes no entries.
+func mergeAdminRoutes(routes server.Routes, panel *admin.Handler) server.Routes {
+	if panel != nil {
+		routes.Admin = panel.Web()
+	}
+	return routes
 }
 
 // openTLS builds the certificate manager when the configuration asks for

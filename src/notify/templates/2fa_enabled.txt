@@ -1,0 +1,14 @@
+Subject: Two-Factor Authentication Enabled - {app_name}
+---
+Hello {recipient_username},
+
+Two-factor authentication ({method}) was enabled on the account
+associated with {recipient_email}.
+
+Request originated from IP: {ip}
+Time: {timestamp}
+
+If you did not make this change, contact {admin_email} immediately.
+
+- The {app_name} Team
+{year} {app_name}

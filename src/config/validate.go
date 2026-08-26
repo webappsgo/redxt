@@ -59,8 +59,46 @@ func (c *Config) Validate() bool {
 	c.validateUsers(def)
 	c.validateOrgs(def)
 	c.validateCustomDomains(def)
+	c.validateNotifications(def)
 
 	return len(c.warnings) != before
+}
+
+// validateNotifications checks the PART 18 toast position, toast
+// duration, and SMTP TLS mode. It never rejects a Host, Username,
+// Password, or From value: those are free-form and their
+// applicability is decided by autodetection/connection testing at
+// startup, not by shape here.
+func (c *Config) validateNotifications(def *Config) {
+	n := &c.Server.Notifications
+
+	validPositions := []string{"top-right", "top-left", "bottom-right", "bottom-left"}
+	if !contains(validPositions, strings.ToLower(n.WebUI.Position)) {
+		c.warnf("invalid notifications.webui.position %q, using %q", n.WebUI.Position, def.Server.Notifications.WebUI.Position)
+		n.WebUI.Position = def.Server.Notifications.WebUI.Position
+	}
+	if n.WebUI.Duration < 0 {
+		c.warnf("invalid notifications.webui.duration %v, using %v", n.WebUI.Duration, def.Server.Notifications.WebUI.Duration)
+		n.WebUI.Duration = def.Server.Notifications.WebUI.Duration
+	}
+
+	smtp := &n.Email.SMTP
+	if smtp.Port == 0 {
+		smtp.Port = def.Server.Notifications.Email.SMTP.Port
+	} else if smtp.Port < 0 || smtp.Port > 65535 {
+		c.warnf("invalid notifications.email.smtp.port %d, using %d", smtp.Port, def.Server.Notifications.Email.SMTP.Port)
+		smtp.Port = def.Server.Notifications.Email.SMTP.Port
+	}
+	if smtp.TLS == "" {
+		smtp.TLS = def.Server.Notifications.Email.SMTP.TLS
+	} else if !contains(SMTPTLSModes, strings.ToLower(smtp.TLS)) {
+		c.warnf("invalid notifications.email.smtp.tls %q, using %q", smtp.TLS, def.Server.Notifications.Email.SMTP.TLS)
+		smtp.TLS = def.Server.Notifications.Email.SMTP.TLS
+	}
+
+	if n.Email.Events == nil {
+		n.Email.Events = defaultNotificationEvents()
+	}
 }
 
 // validateServer checks the core listen address, port, base URL, and

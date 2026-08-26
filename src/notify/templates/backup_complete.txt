@@ -1,0 +1,11 @@
+Subject: Backup Complete - {app_name}
+---
+Hello,
+
+A backup of {app_name} completed successfully.
+
+File: {filename}
+Size: {size}
+Time: {timestamp}
+
+- {app_name} on {fqdn}

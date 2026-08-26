@@ -1,0 +1,13 @@
+Subject: Backup Failed - {app_name}
+---
+Hello,
+
+A backup of {app_name} failed to complete.
+
+File: {filename}
+Error: {error}
+Time: {timestamp}
+
+Please check the server logs on {fqdn} and retry the backup.
+
+- {app_name} on {fqdn}

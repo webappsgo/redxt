@@ -79,6 +79,7 @@ type Server struct {
 	Users          Users          `yaml:"users"`
 	Orgs           Orgs           `yaml:"orgs"`
 	Features       Features       `yaml:"features"`
+	Notifications  Notifications  `yaml:"notifications"`
 }
 
 // Users holds server.users.* per AI.md PART 34 "Multi-User".
@@ -231,6 +232,54 @@ type CustomDomains struct {
 	Reserved []string `yaml:"reserved"`
 	// BlockedPatterns lists regular expressions a domain must not match.
 	BlockedPatterns []string `yaml:"blocked_patterns"`
+}
+
+// Notifications holds server.notifications.* per AI.md PART 18 "Email &
+// Notifications" — the WebUI toast/banner/notification-center settings
+// and the SMTP-backed email settings, including the per-event send
+// toggles.
+type Notifications struct {
+	WebUI NotificationsWebUI `yaml:"webui"`
+	Email NotificationsEmail `yaml:"email"`
+}
+
+// NotificationsWebUI holds server.notifications.webui.*.
+type NotificationsWebUI struct {
+	// Position is where a toast is anchored on screen.
+	Position string `yaml:"position"`
+	// Duration is how long a non-error toast stays visible before it
+	// auto-dismisses. An error toast is never auto-dismissed.
+	Duration Duration `yaml:"duration"`
+}
+
+// NotificationsEmail holds server.notifications.email.*.
+type NotificationsEmail struct {
+	SMTP SMTPConfig `yaml:"smtp"`
+	From EmailFrom  `yaml:"from"`
+	// Events maps each notification event name to whether it sends an
+	// email in addition to its WebUI notification. Security-category
+	// events are never user-disableable regardless of this map.
+	Events map[string]bool `yaml:"events"`
+}
+
+// SMTPConfig holds server.notifications.email.smtp.*. An empty Host
+// means autodetect at startup; a non-empty Host is tested at startup
+// instead.
+type SMTPConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	// TLS is one of config.SMTPTLSModes: auto, starttls, tls, none.
+	TLS string `yaml:"tls"`
+}
+
+// EmailFrom holds server.notifications.email.from.*. An empty Name
+// falls back to the application name; an empty Email falls back to
+// no-reply@{fqdn}.
+type EmailFrom struct {
+	Name  string `yaml:"name"`
+	Email string `yaml:"email"`
 }
 
 // SSL holds server.ssl.* per AI.md PART 15 "SSL/TLS & Let's Encrypt".

@@ -1,0 +1,15 @@
+Subject: Verify Your Email - {app_name}
+---
+Hello {recipient_username},
+
+Please verify {recipient_email} to finish setting up your
+{app_name} account.
+
+Verify your email here (expires {expires}):
+{verify_link}
+
+If you did not create this account, you can safely ignore this
+email.
+
+- The {app_name} Team
+{year} {app_name}

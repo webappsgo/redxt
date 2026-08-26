@@ -1,0 +1,18 @@
+Subject: New Login Detected - {app_name}
+---
+Hello {recipient_username},
+
+A new sign-in to {recipient_email} was detected:
+
+Time: {time}
+IP address: {ip}
+Location: {location}
+Device: {device}
+
+If this was you, no action is needed.
+
+If you did not sign in, change your password immediately and
+contact {admin_email}.
+
+- The {app_name} Team
+{year} {app_name}

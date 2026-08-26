@@ -1,0 +1,17 @@
+Subject: Security Alert - {app_name}
+---
+Hello {recipient_username},
+
+A security event was detected on the account associated with
+{recipient_email}:
+
+Event: {event}
+IP address: {ip}
+Details: {details}
+Time: {timestamp}
+
+If you did not take this action, secure your account immediately
+and contact {admin_email}.
+
+- The {app_name} Team
+{year} {app_name}

@@ -1,0 +1,15 @@
+Subject: API Token Regenerated - {app_name}
+---
+Hello {recipient_username},
+
+The API token "{token_name}" on the account associated with
+{recipient_email} was regenerated. The previous token no longer
+works.
+
+IP address: {ip}
+Time: {timestamp}
+
+If you did not do this, contact {admin_email} immediately.
+
+- The {app_name} Team
+{year} {app_name}

@@ -25,6 +25,13 @@ var RuntimeVars = []string{
 	"DOMAIN",
 	"DATABASE_DRIVER",
 	"DATABASE_URL",
+	"SMTP_HOST",
+	"SMTP_PORT",
+	"SMTP_USERNAME",
+	"SMTP_PASSWORD",
+	"SMTP_TLS",
+	"SMTP_FROM_NAME",
+	"SMTP_FROM_EMAIL",
 }
 
 // applyInitEnv seeds unset values from the init-only environment
@@ -65,6 +72,48 @@ func (c *Config) ApplyRuntimeEnv() {
 	if v := os.Getenv("DATABASE_URL"); v != "" {
 		c.Server.Database.URL = v
 	}
+
+	smtp := &c.Server.Notifications.Email.SMTP
+	if v := strings.TrimSpace(os.Getenv("SMTP_HOST")); v != "" {
+		smtp.Host = v
+	}
+	if v := strings.TrimSpace(os.Getenv("SMTP_PORT")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
+			smtp.Port = n
+		} else {
+			c.warnf("invalid SMTP_PORT %q, ignoring it", v)
+		}
+	}
+	if v := os.Getenv("SMTP_USERNAME"); v != "" {
+		smtp.Username = v
+	}
+	if v := os.Getenv("SMTP_PASSWORD"); v != "" {
+		smtp.Password = v
+	}
+	if v := strings.TrimSpace(os.Getenv("SMTP_TLS")); v != "" {
+		if isSMTPTLSMode(v) {
+			smtp.TLS = v
+		} else {
+			c.warnf("invalid SMTP_TLS %q, ignoring it", v)
+		}
+	}
+	from := &c.Server.Notifications.Email.From
+	if v := os.Getenv("SMTP_FROM_NAME"); v != "" {
+		from.Name = v
+	}
+	if v := os.Getenv("SMTP_FROM_EMAIL"); v != "" {
+		from.Email = v
+	}
+}
+
+// isSMTPTLSMode reports whether v is one of config.SMTPTLSModes.
+func isSMTPTLSMode(v string) bool {
+	for _, m := range SMTPTLSModes {
+		if strings.EqualFold(v, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // Domain returns the DOMAIN environment override, which is the

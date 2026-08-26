@@ -1,0 +1,31 @@
+Subject: [{severity}] Security Breach Detected - {app_name}
+---
+Hello,
+
+A data breach was detected on {app_name} and requires immediate
+attention.
+
+Incident ID: {breach_id}
+Severity: {severity}
+Type: {breach_type}
+Detection method: {detection_method}
+Trigger: {trigger}
+Source IP: {source_ip}
+
+Summary:
+{breach_summary}
+
+Affected scope: {affected_scope}
+Affected users: {affected_users}
+Affected data: {affected_data}
+
+Automatic actions already taken:
+{auto_actions}
+
+Compliance requirements: {compliance_requirements}
+Notification deadline: {notify_deadline}
+
+Review and respond in the admin panel:
+{admin_url}
+
+- {app_name} on {fqdn}

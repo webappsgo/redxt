@@ -1,0 +1,12 @@
+Subject: SSL Certificate Expiring - {app_name}
+---
+Hello,
+
+The SSL certificate for {fqdn} expires in {expires_in}, on
+{expiry_date}.
+
+Automatic renewal will be attempted before expiry. If renewal has
+been failing, address it before the certificate expires to avoid
+an outage.
+
+- {app_name} on {fqdn}

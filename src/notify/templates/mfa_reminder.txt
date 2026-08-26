@@ -1,0 +1,16 @@
+Subject: Secure Your Account - {app_name}
+---
+Hello {recipient_username},
+
+Two-factor authentication is not yet enabled on the account
+associated with {recipient_email}. Enabling it adds a second layer
+of protection beyond your password.
+
+Set it up here:
+{setup_url}
+
+Not interested right now:
+{dismiss_url}
+
+- The {app_name} Team
+{year} {app_name}

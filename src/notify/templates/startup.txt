@@ -1,0 +1,11 @@
+Subject: {app_name} Started - {app_name}
+---
+Hello,
+
+{app_name} started successfully on {fqdn}.
+
+Version: {version}
+Mode: {mode}
+Time: {timestamp}
+
+- {app_name} on {fqdn}

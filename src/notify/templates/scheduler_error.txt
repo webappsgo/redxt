@@ -1,0 +1,12 @@
+Subject: Scheduled Task Failed - {app_name}
+---
+Hello,
+
+A scheduled task on {app_name} failed to complete.
+
+Task: {task_name}
+Error: {error}
+Next run: {next_run}
+Time: {timestamp}
+
+- {app_name} on {fqdn}

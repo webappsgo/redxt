@@ -1,0 +1,32 @@
+Subject: Important Security Notice - {app_name}
+---
+Hello {recipient_username},
+
+We are writing to inform you of a security incident that may have
+affected data associated with your account ({recipient_email}).
+
+Incident ID: {breach_id}
+Date of incident: {breach_date}
+Type of incident: {breach_type}
+Data potentially affected: {affected_data}
+
+What happened:
+{breach_summary}
+
+What we recommend you do:
+{recommended_actions}
+
+{regulatory_notice}
+
+You must be notified by: {notification_deadline}
+
+Questions can be directed to:
+Email: {contact_email}
+Phone: {contact_phone}
+Data Protection Officer: {dpo_contact}
+
+We take the security of your data seriously and are taking steps to
+prevent this from happening again.
+
+- The {app_name} Team
+{year} {app_name}

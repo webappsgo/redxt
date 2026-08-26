@@ -1,0 +1,15 @@
+Subject: Two-Factor Authentication Disabled - {app_name}
+---
+Hello {recipient_username},
+
+Two-factor authentication ({method}) was disabled on the account
+associated with {recipient_email}.
+
+Request originated from IP: {ip}
+Time: {timestamp}
+
+If you did not make this change, your account may be compromised.
+Contact {admin_email} immediately and change your password.
+
+- The {app_name} Team
+{year} {app_name}

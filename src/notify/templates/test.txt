@@ -1,0 +1,10 @@
+Subject: Test Email - {app_name}
+---
+Hello,
+
+This is a test email from {app_name} on {fqdn}, sent to confirm
+your SMTP configuration is working.
+
+Sent: {timestamp}
+
+- {app_name} on {fqdn}

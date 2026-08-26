@@ -249,3 +249,71 @@ Daily Build (which does have workflow_dispatch) was manually dispatched
 as a substitute signal and returned success for the same commit. Adding
 workflow_dispatch to ci.yml would let a missed/stuck push-triggered run
 be manually retried in future without relying on an unrelated workflow.
+
+## [ ] PART 18: admin_notifications / admin_notification_prefs schema
+Read: AI.md PART 18 ("WebUI Notification System"), src/database/schema_server.go
+The PART 18 config layer and `src/notify` (SMTP autodetect/send, embedded
+email templates, `{variable}` template engine, validation) are implemented
+and tested. The server.db side of the WebUI notification system is not:
+add `admin_notifications` (id, type, title, message, link, read, created_at)
+and `admin_notification_prefs` tables to `schema_server.go`, following the
+existing table-creation pattern; do not touch the existing
+`notification_channels` table.
+
+## [ ] PART 18: user_notifications schema + notification_prefs column
+Read: AI.md PART 18, src/database/schema_users.go
+Add a `user_notifications` table (same shape as `admin_notifications`, but
+in users.db — never merged with the admin table) to `schema_users.go`, and
+add a `notification_prefs` column to `user_preferences` via an idempotent
+`ALTER TABLE ... ADD COLUMN` in `usersCoreUpdates`, matching the existing
+additive-migration pattern in that file.
+
+## [ ] PART 18: store/service layer for WebUI notifications
+Read: AI.md PART 18, src/server/store/preferences.go, src/server/service/service.go
+Once the schema above exists, add store methods (create, list paginated
+with `?unread=true` filter, mark-one-read, mark-all-read, unread count) and
+a `Service` wrapper following the existing `Service`/`Options`/`New`/
+`mapStoreErr`/`fieldError` pattern. Apply retention (30 days / max 100
+rows) via purge-on-write, since no scheduler exists yet — do not add a fake
+cron job to do this; PART 19 (Scheduler) is the correct home for a
+periodic purge once it is built.
+
+## [ ] PART 18: Notify() decision engine
+Read: AI.md PART 18 ("Notification Preferences")
+Add a single entry point, e.g. `func (s *Service) Notify(ctx, event string,
+recipient Recipient, vars map[string]string) error`, that always writes a
+WebUI row (respecting the recipient's webui preference and per-category
+defaults) and additionally sends email via `notify.Send` when SMTP is
+enabled and that event's email preference is true. The four
+Security-category events (`login_alert`, `security_alert`,
+`password_changed`, `token_regenerated`) must never be user-disableable —
+enforce this in code, not only by omitting a UI toggle.
+
+## [ ] PART 18: wire real notification trigger call sites
+Read: AI.md PART 18, src/server/service/*.go, src/server/admin/
+Once `Notify()` exists, call it from the real actions that already exist:
+login (login_alert), password change (password_changed), 2FA
+enable/disable, API token regeneration, admin `CompleteSetup` (welcome
+email — see `src/server/admin/service.go`). For events with no existing
+call site yet (`backup_complete`/`backup_failed`, `ssl_expiring`/
+`ssl_renewed`/`ssl_renewal_failed`, `scheduler_error`, `startup`/
+`shutdown`, `update_available`/`update_installed`), do not fake a call
+site — wire each one when its owning feature (PART 19 scheduler, PART 22
+backup, PART 23 update, PART 15 SSL renewal) is actually built.
+
+## [ ] PART 18: admin panel routes (template editor, notification center)
+Read: AI.md PART 18 ("Admin Panel"), .claude/rules/frontend-rules.md
+Add `/server/{admin_path}/...` routes for the email-template editor
+(list/edit/reset, using `notify.Load`/`SaveOverride`/`ResetOverride`/
+`Validate`) and an admin notification center (bell icon, polling — not
+WebSocket; this is a deliberate simplification and should stay documented
+here, not silently upgraded without discussion). Audit-log template edits,
+resets, and test-email sends via the existing `audit_log` table/
+`src/server/store/audit.go` pattern.
+
+## [ ] PART 18: user panel routes (notification preferences + center)
+Read: AI.md PART 18, .claude/rules/optional-rules.md (PART 34)
+Add `/users/settings/notifications` (preferences) and a user notification
+center, reusing the same store/service pattern as the admin side but
+against the separate `user_notifications` table/users.db connection —
+never merge with the admin notification tables.

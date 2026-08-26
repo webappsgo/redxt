@@ -1,0 +1,11 @@
+Subject: Update Installed - {app_name}
+---
+Hello,
+
+{app_name} on {fqdn} was updated successfully.
+
+Previous version: {previous_version}
+New version: {new_version}
+Time: {timestamp}
+
+- {app_name} on {fqdn}

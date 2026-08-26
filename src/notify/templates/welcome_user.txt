@@ -1,0 +1,17 @@
+Subject: Welcome to {app_name}
+---
+Hello {recipient_username},
+
+Your account on {app_name} has been created using {recipient_email}.
+
+Sign in here:
+{login_url}
+
+View and complete your profile here:
+{profile_url}
+
+If you did not create this account, you can safely ignore this
+email, or contact us at {admin_email}.
+
+- The {app_name} Team
+{year} {app_name}

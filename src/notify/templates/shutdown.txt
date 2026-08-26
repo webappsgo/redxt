@@ -1,0 +1,11 @@
+Subject: {app_name} Stopped - {app_name}
+---
+Hello,
+
+{app_name} on {fqdn} is shutting down.
+
+Reason: {reason}
+Uptime: {uptime}
+Time: {timestamp}
+
+- {app_name} on {fqdn}

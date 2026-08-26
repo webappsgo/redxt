@@ -1,0 +1,17 @@
+Subject: Welcome to {app_name}
+---
+Hello {admin_username},
+
+Your Server Admin account for {app_name} has been created.
+
+You can sign in to the admin panel here:
+{admin_url}
+
+Server: {app_url}
+FQDN: {fqdn}
+
+If you did not expect this account, contact the person who set up
+this {app_name} instance immediately.
+
+- The {app_name} Team
+{year} {app_name}

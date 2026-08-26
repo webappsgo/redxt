@@ -322,6 +322,54 @@ func DefaultConfig() *Config {
 					BlockedPatterns:   append([]string(nil), DefaultBlockedDomainPatterns...),
 				},
 			},
+
+			Notifications: Notifications{
+				WebUI: NotificationsWebUI{
+					Position: DefaultNotificationPosition,
+					Duration: Duration(5 * time.Second),
+				},
+				Email: NotificationsEmail{
+					SMTP: SMTPConfig{
+						Port: DefaultSMTPPort,
+						TLS:  "auto",
+					},
+					Events: defaultNotificationEvents(),
+				},
+			},
 		},
+	}
+}
+
+// DefaultNotificationPosition is the first-run toast anchor, per AI.md
+// PART 18 "Sane Defaults".
+const DefaultNotificationPosition = "top-right"
+
+// DefaultSMTPPort is the first-run SMTP submission port, per AI.md
+// PART 18 "SMTP Config".
+const DefaultSMTPPort = 587
+
+// defaultNotificationEvents returns the per-event email-send defaults
+// from AI.md PART 18 "Configuration". Every entry here can be
+// overridden by an admin or a recipient, except the Security-category
+// events (login_alert, security_alert, password_changed,
+// token_regenerated), which PART 18's "Notification Preferences"
+// table marks as never user-disableable — that rule is enforced in
+// the notify decision engine, not by omitting them here.
+func defaultNotificationEvents() map[string]bool {
+	return map[string]bool{
+		"startup":            false,
+		"shutdown":           false,
+		"backup_complete":    false,
+		"backup_failed":      true,
+		"ssl_expiring":       true,
+		"ssl_renewed":        false,
+		"ssl_renewal_failed": true,
+		"login_alert":        true,
+		"security_alert":     true,
+		"scheduler_error":    true,
+		"password_changed":   true,
+		"token_regenerated":  true,
+		"update_available":   false,
+		"update_installed":   true,
 	}
 }

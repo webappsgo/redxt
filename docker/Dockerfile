@@ -46,7 +46,11 @@ ARG LICENSE=MIT
 
 # Install required packages
 # NOTE: Tor binary installed but NOT configured here - binary handles all Tor setup (see PART 32)
-RUN apk add --no-cache \
+# apk upgrade first so the base image's own packages (libcrypto3,
+# libssl3, etc.) are patched, not just what this layer adds - the CI
+# image scan fails the build on any known-fixed HIGH/CRITICAL CVE.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     git \
     curl \
     bash \

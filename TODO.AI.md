@@ -42,25 +42,25 @@ Foundation first, then layered by what each PART actually needs at runtime:
 
 ## Foundation (PART 7-13)
 
-## [ ] Implement binary requirements (single self-contained binary, build/version embedding)
+## [x] Implement binary requirements (single self-contained binary, build/version embedding)
 Read: AI.md PART 7
 
-## [ ] Implement server binary CLI (flags, subcommands — including --address/--port already wired in entrypoint.sh but not yet in src/main.go)
+## [x] Implement server binary CLI (flags, subcommands — including --address/--port already wired in entrypoint.sh but not yet in src/main.go)
 Read: AI.md PART 8
 
-## [ ] Implement error handling & caching
+## [x] Implement error handling & caching
 Read: AI.md PART 9
 
-## [ ] Implement database layer & clustering
+## [x] Implement database layer & clustering
 Read: AI.md PART 10
 
-## [ ] Implement security & logging (authN primitives, structured logging, secret handling)
+## [x] Implement security & logging (authN primitives, structured logging, secret handling)
 Read: AI.md PART 11
 
-## [ ] Implement server configuration (config file, env vars, precedence)
+## [x] Implement server configuration (config file, env vars, precedence)
 Read: AI.md PART 12
 
-## [ ] Implement health checks & versioning
+## [x] Implement health checks & versioning
 Read: AI.md PART 13
 
 ## API and transport layer

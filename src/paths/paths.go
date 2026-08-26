@@ -90,7 +90,8 @@ func isBSD() bool {
 }
 
 // applyInitOverrides applies the init-only environment variables
-// (CONFIG_DIR, DATA_DIR, LOG_DIR, DATABASE_DIR, BACKUP_DIR) documented
+// (CONFIG_DIR, DATA_DIR, CACHE_DIR, LOG_DIR, PID_FILE, DATABASE_DIR,
+// BACKUP_DIR) documented
 // in AI.md PART 5. These are consulted only on first run by the config
 // package; paths.Resolve exposes the override so config can decide.
 func applyInitOverrides(p *Paths) {
@@ -104,6 +105,12 @@ func applyInitOverrides(p *Paths) {
 	if v := os.Getenv("LOG_DIR"); v != "" {
 		p.Logs = v
 		p.LogFile = filepath.Join(v, "server.log")
+	}
+	if v := os.Getenv("CACHE_DIR"); v != "" {
+		p.Cache = v
+	}
+	if v := os.Getenv("PID_FILE"); v != "" {
+		p.PIDFile = v
 	}
 	if v := os.Getenv("DATABASE_DIR"); v != "" {
 		p.DB = v

@@ -20,6 +20,13 @@ const (
 	projectName  = "redxt"
 )
 
+// ProjectName returns the public {project_name} this build was made
+// for. It is exported so callers outside this package can name the
+// project without hardcoding the identifier, which AI.md PART 4 forbids.
+func ProjectName() string {
+	return projectName
+}
+
 // Paths holds every resolved filesystem location the server needs.
 type Paths struct {
 	Binary     string

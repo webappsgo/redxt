@@ -67,29 +67,6 @@ func (c *Config) ApplyRuntimeEnv() {
 	}
 }
 
-// NormalizeDatabaseDriver maps every accepted spelling of a database
-// driver from the AI.md PART 5 DATABASE_DRIVER table onto its
-// canonical name. An unrecognized value is returned lowercased so
-// validation can reject it and warn.
-func NormalizeDatabaseDriver(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "sqlite", "sqlite2", "sqlite3":
-		return "sqlite"
-	case "libsql", "turso":
-		return "libsql"
-	case "postgres", "pgsql", "postgresql":
-		return "postgres"
-	case "mysql", "mariadb":
-		return "mysql"
-	case "mssql":
-		return "mssql"
-	case "mongodb", "mongo":
-		return "mongodb"
-	default:
-		return strings.ToLower(strings.TrimSpace(raw))
-	}
-}
-
 // Domain returns the DOMAIN environment override, which is the
 // highest-priority source for the server's own FQDN after
 // reverse-proxy headers.

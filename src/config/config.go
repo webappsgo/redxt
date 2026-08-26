@@ -53,6 +53,16 @@ type Server struct {
 	ApplicationName string `yaml:"application_name"`
 	// ApplicationTagline is the display description.
 	ApplicationTagline string `yaml:"application_tagline"`
+	// AdminPath is the URL segment the admin panel is isolated under,
+	// mounted as /server/{admin_path}. PART 17 requires this to be
+	// configurable rather than fixed.
+	AdminPath string `yaml:"admin_path"`
+	// APIVersion is the version segment of every versioned API route,
+	// used to build /api/{api_version}/... per PART 14.
+	APIVersion string `yaml:"api_version"`
+
+	SSL SSL `yaml:"ssl"`
+	Web Web `yaml:"web"`
 
 	Limits         Limits         `yaml:"limits"`
 	Compression    Compression    `yaml:"compression"`
@@ -66,6 +76,73 @@ type Server struct {
 	Security       Security       `yaml:"security"`
 	Healthz        Healthz        `yaml:"healthz"`
 	Contact        Contact        `yaml:"contact"`
+}
+
+// SSL holds server.ssl.* per AI.md PART 15 "SSL/TLS & Let's Encrypt".
+// Empty Cert and Key mean the certificate is auto-detected through the
+// PART 15 lookup order rather than loaded from a fixed path.
+type SSL struct {
+	// Enabled forces HTTPS on the configured port. Port 443 implies
+	// HTTPS on its own; this setting overrides for any other port.
+	Enabled bool `yaml:"enabled"`
+	// Port is the HTTPS listener port when the server runs a dual
+	// HTTP/HTTPS pair, as written `port: "80,443"` on the command line
+	// or in a legacy config. Zero means no separate HTTPS listener.
+	Port int `yaml:"port"`
+	// Cert is an optional manual certificate path override.
+	Cert string `yaml:"cert"`
+	// Key is an optional manual private key path override.
+	Key string `yaml:"key"`
+	// MinVersion is the lowest negotiated TLS version, TLS1.2 or TLS1.3.
+	MinVersion string `yaml:"min_version"`
+
+	LetsEncrypt LetsEncrypt `yaml:"letsencrypt"`
+}
+
+// LetsEncrypt holds server.ssl.letsencrypt.* per PART 15.
+type LetsEncrypt struct {
+	// Enabled turns on automatic ACME certificate issuance and renewal.
+	Enabled bool `yaml:"enabled"`
+	// Email is the ACME account contact address.
+	Email string `yaml:"email"`
+	// Challenge is http-01, tls-alpn-01, or dns-01.
+	Challenge string `yaml:"challenge"`
+	// Staging directs issuance at the Let's Encrypt staging endpoint.
+	Staging bool `yaml:"staging"`
+}
+
+// Web holds server.web.* — the browser-facing policy knobs defined in
+// AI.md PART 16 (CORS, CSRF) and PART 15 (HSTS).
+type Web struct {
+	// CORS is the allow-list for Access-Control-Allow-Origin. "*"
+	// leaves the policy unset and lets the resolution order pick an
+	// origin; "" disables CORS entirely.
+	CORS string `yaml:"cors"`
+
+	CSRF CSRF `yaml:"csrf"`
+	HSTS HSTS `yaml:"hsts"`
+}
+
+// CSRF holds server.web.csrf.* per PART 16 "CSRF Protection".
+type CSRF struct {
+	// Enabled turns on same-site token validation for cookie-authed
+	// state-changing requests.
+	Enabled bool `yaml:"enabled"`
+	// ExemptPaths lists route prefixes that skip CSRF validation.
+	ExemptPaths []string `yaml:"exempt_paths"`
+}
+
+// HSTS holds server.web.hsts.* per PART 15. The header is emitted only
+// when the request was served over TLS.
+type HSTS struct {
+	// Enabled turns on Strict-Transport-Security.
+	Enabled bool `yaml:"enabled"`
+	// MaxAge is the max-age directive in seconds.
+	MaxAge int `yaml:"max_age"`
+	// IncludeSubdomains adds the includeSubDomains directive.
+	IncludeSubdomains bool `yaml:"include_subdomains"`
+	// Preload adds the preload directive.
+	Preload bool `yaml:"preload"`
 }
 
 // Limits holds server.limits.* per PART 12 "Request Limits".
@@ -321,9 +398,16 @@ type Security struct {
 
 // Healthz holds server.healthz.* per PART 13.
 type Healthz struct {
-	// Root exposes the /healthz, /readyz, and /livez aliases at the
-	// site root in addition to the canonical API paths.
-	Root bool `yaml:"root"`
+	// Root gates the optional root-level /healthz alias. The canonical
+	// route stays /server/healthz whether or not the alias is mounted.
+	Root HealthzRoot `yaml:"root"`
+}
+
+// HealthzRoot holds server.healthz.root.* per AI.md PART 13 and PART 14.
+type HealthzRoot struct {
+	// Enabled mounts /healthz on the SAME handler as /server/healthz.
+	// It is never a redirect, and it defaults to false.
+	Enabled bool `yaml:"enabled"`
 }
 
 // Contact holds server.contact.* per PART 12 "Contact Configuration".
@@ -445,6 +529,53 @@ func migrateLegacyYAML(ymlPath string) {
 		return
 	}
 	_ = os.Rename(legacy, ymlPath)
+}
+
+// APIBasePath returns the versioned API prefix, "/api/" plus the
+// configured version segment. AI.md PART 14 forbids hardcoding "v1"
+// anywhere in the code, so every route builder starts from here.
+func (c *Config) APIBasePath() string {
+	v := c.Server.APIVersion
+	if v == "" {
+		v = DefaultAPIVersion
+	}
+	return "/api/" + v
+}
+
+// AdminBasePath returns the admin panel prefix, "/server/" plus the
+// configured admin path segment, per AI.md PART 17.
+func (c *Config) AdminBasePath() string {
+	p := c.Server.AdminPath
+	if p == "" {
+		p = DefaultAdminPath
+	}
+	return "/server/" + p
+}
+
+// HTTPSPort returns the port the TLS listener should bind, or zero when
+// this instance serves plain HTTP only. AI.md PART 15 makes port 443
+// HTTPS-only on its own, lets ssl.enabled force TLS on any single port,
+// and treats a configured ssl.port as the HTTPS half of a dual pair.
+func (c *Config) HTTPSPort() int {
+	if c.Server.SSL.Port > 0 {
+		return c.Server.SSL.Port
+	}
+	if c.Server.Port == 443 || c.Server.SSL.Enabled {
+		return c.Server.Port
+	}
+	return 0
+}
+
+// HTTPPort returns the port the plaintext listener should bind, or zero
+// when the instance is HTTPS-only.
+func (c *Config) HTTPPort() int {
+	if c.Server.SSL.Port > 0 {
+		return c.Server.Port
+	}
+	if c.Server.Port == 443 || c.Server.SSL.Enabled {
+		return 0
+	}
+	return c.Server.Port
 }
 
 // Save writes the current configuration back to its resolved path.

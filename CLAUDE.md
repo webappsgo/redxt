@@ -110,6 +110,6 @@ On EVERY new conversation or after "context compacted" message:
 - Full spec: `AI.md` (~65k lines) ← **SOURCE OF TRUTH**
 
 ## Current Project State
-- Last read AI.md: 2026-08-26 (PART 0-6 bootstrap)
-- Current task: Foundation scaffold complete; feature PARTs pending per TODO.AI.md
-- Relevant PARTs: 0-6 (done), 7-37 (backlog)
+- Last read AI.md: 2026-08-26 (PART 14, 15)
+- Current task: API structure and SSL/TLS complete; remaining feature PARTs per TODO.AI.md
+- Relevant PARTs: 0-15 (done), 16-37 (backlog)

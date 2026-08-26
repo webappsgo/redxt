@@ -12,15 +12,17 @@ import (
 // values. A value outside its set is replaced with the default and a
 // warning is recorded.
 var (
-	validLogLevels       = []string{"debug", "info", "warn", "error"}
+	validLogLevels       = LogLevels
 	validAccessFormats   = []string{"apache", "nginx", "json", "custom"}
 	validTextFormats     = []string{"text", "json", "custom"}
 	validSecurityFormats = []string{"fail2ban", "syslog", "cef", "json", "text", "custom"}
 	validRotate          = []string{"never", "daily", "weekly", "monthly", "yearly"}
-	validCacheTypes      = []string{"none", "memory", "valkey", "redis"}
-	validDatabaseTypes   = []string{"sqlite", "libsql", "postgres", "mysql", "mssql", "mongodb"}
+	validCacheTypes      = CacheTypes
+	validDatabaseTypes   = DatabaseDrivers
 	validSameSite        = []string{"strict", "lax", "none"}
 	validSecure          = []string{"auto", "true", "false"}
+	validTLSVersions     = []string{"TLS1.2", "TLS1.3"}
+	validACMEChallenges  = []string{"http-01", "tls-alpn-01", "dns-01"}
 )
 
 // Validate checks every configuration value, replacing anything
@@ -44,6 +46,8 @@ func (c *Config) Validate() bool {
 	c.validateLogs(def)
 	c.validateDatabase(def)
 	c.validateTrustedProxies()
+	c.validateSSL(def)
+	c.validateWeb(def)
 
 	return len(c.warnings) != before
 }
@@ -82,6 +86,133 @@ func (c *Config) validateServer(def *Config) {
 	if s.Security.EncryptionKeyVersion < 1 {
 		s.Security.EncryptionKeyVersion = 1
 	}
+
+	if !IsRouteSegment(s.AdminPath) {
+		if strings.TrimSpace(s.AdminPath) != "" {
+			c.warnf("invalid server.admin_path %q, using %q", s.AdminPath, def.Server.AdminPath)
+		}
+		s.AdminPath = def.Server.AdminPath
+	}
+
+	if !IsRouteSegment(s.APIVersion) {
+		if strings.TrimSpace(s.APIVersion) != "" {
+			c.warnf("invalid server.api_version %q, using %q", s.APIVersion, def.Server.APIVersion)
+		}
+		s.APIVersion = def.Server.APIVersion
+	}
+}
+
+// IsRouteSegment reports whether s is usable as a single URL path
+// segment under the AI.md PART 14 route rules: non-empty, lowercase,
+// alphanumeric with interior hyphens, and no slashes or dots.
+func IsRouteSegment(s string) bool {
+	if s == "" || strings.HasPrefix(s, "-") || strings.HasSuffix(s, "-") {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// validateSSL checks the TLS listener settings from AI.md PART 15.
+func (c *Config) validateSSL(def *Config) {
+	s := &c.Server.SSL
+	d := def.Server.SSL
+
+	if s.Port < 0 || s.Port > 65535 {
+		c.warnf("invalid server.ssl.port %d, disabling the HTTPS listener", s.Port)
+		s.Port = 0
+	}
+	if s.Port != 0 && s.Port == c.Server.Port {
+		c.warnf("server.ssl.port %d duplicates server.port, disabling the HTTPS listener", s.Port)
+		s.Port = 0
+	}
+
+	if !containsFold(validTLSVersions, s.MinVersion) {
+		if strings.TrimSpace(s.MinVersion) != "" {
+			c.warnf("invalid server.ssl.min_version %q, using %q", s.MinVersion, d.MinVersion)
+		}
+		s.MinVersion = d.MinVersion
+	} else {
+		s.MinVersion = strings.ToUpper(strings.TrimSpace(s.MinVersion))
+	}
+
+	// A manual override needs both halves; one alone would silently
+	// fall through to auto-detection and hide the misconfiguration.
+	if (s.Cert == "") != (s.Key == "") {
+		c.warnf("server.ssl.cert and server.ssl.key must be set together, falling back to certificate auto-detection")
+		s.Cert = ""
+		s.Key = ""
+	}
+
+	le := &s.LetsEncrypt
+	if !containsFold(validACMEChallenges, le.Challenge) {
+		if strings.TrimSpace(le.Challenge) != "" {
+			c.warnf("invalid server.ssl.letsencrypt.challenge %q, using %q", le.Challenge, d.LetsEncrypt.Challenge)
+		}
+		le.Challenge = d.LetsEncrypt.Challenge
+	} else {
+		le.Challenge = strings.ToLower(strings.TrimSpace(le.Challenge))
+	}
+	if le.Enabled && strings.TrimSpace(le.Email) == "" {
+		c.warnf("server.ssl.letsencrypt.enabled is set without an email address, disabling automatic certificates")
+		le.Enabled = false
+	}
+}
+
+// validateWeb checks the CORS, CSRF, and HSTS policy settings.
+func (c *Config) validateWeb(def *Config) {
+	w := &c.Server.Web
+	d := def.Server.Web
+
+	w.CORS = strings.TrimSpace(w.CORS)
+
+	if w.CSRF.ExemptPaths == nil {
+		w.CSRF.ExemptPaths = append([]string(nil), d.CSRF.ExemptPaths...)
+	}
+	kept := w.CSRF.ExemptPaths[:0]
+	for _, p := range w.CSRF.ExemptPaths {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !strings.HasPrefix(p, "/") {
+			c.warnf("invalid server.web.csrf.exempt_paths entry %q, must start with /", p)
+			continue
+		}
+		kept = append(kept, p)
+	}
+	w.CSRF.ExemptPaths = kept
+
+	if w.HSTS.MaxAge < 0 {
+		c.warnf("invalid server.web.hsts.max_age %d, using %d", w.HSTS.MaxAge, d.HSTS.MaxAge)
+		w.HSTS.MaxAge = d.HSTS.MaxAge
+	}
+	// Preload is only honored by browsers with a long max-age and the
+	// includeSubDomains directive, so an incomplete set is corrected.
+	if w.HSTS.Preload && (!w.HSTS.IncludeSubdomains || w.HSTS.MaxAge < 31536000) {
+		c.warnf("server.web.hsts.preload requires include_subdomains and a max_age of at least 31536000, dropping preload")
+		w.HSTS.Preload = false
+	}
+}
+
+// containsFold reports whether list holds s, ignoring case and
+// surrounding whitespace.
+func containsFold(list []string, s string) bool {
+	s = strings.TrimSpace(s)
+	for _, v := range list {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateLimits checks the request size and timeout limits.

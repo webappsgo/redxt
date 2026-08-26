@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 )
@@ -61,6 +62,12 @@ type Response struct {
 	Error   string         `json:"error,omitempty"`
 	Message string         `json:"message,omitempty"`
 	Details map[string]any `json:"details,omitempty"`
+
+	// Debug carries developer-only diagnostics. The PART 11 output
+	// sanitization pipeline strips every dev_only field whenever the
+	// debug flag is off, which is why the tag is present here rather
+	// than the field being conditionally populated by each handler.
+	Debug any `json:"_debug,omitempty" dev_only:"true"`
 }
 
 // HTTPStatus maps an error code to its HTTP status code. Unknown codes map to
@@ -210,7 +217,21 @@ func From(err error) *Error {
 // SendOK writes a success envelope with the supplied payload.
 func SendOK(w http.ResponseWriter, data any) error {
 	w.Header().Set("Content-Type", "application/json")
-	return json.NewEncoder(w).Encode(Response{OK: true, Data: data})
+	return WriteJSON(w, Response{OK: true, Data: data})
+}
+
+// WriteJSON writes v as the indented JSON document AI.md PART 14
+// mandates for every API response: two-space indentation followed by a
+// single trailing newline, so piping a response into a file or a diff
+// produces a well-formed text file.
+func WriteJSON(w io.Writer, v any) error {
+	body, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	body = append(body, '\n')
+	_, err = w.Write(body)
+	return err
 }
 
 // SendError writes an error envelope with the error's status code.
@@ -221,7 +242,7 @@ func SendOK(w http.ResponseWriter, data any) error {
 func SendError(w http.ResponseWriter, e *Error) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(e.HTTPStatusCode)
-	return json.NewEncoder(w).Encode(Response{
+	return WriteJSON(w, Response{
 		OK:      false,
 		Error:   e.Code,
 		Message: e.Message,

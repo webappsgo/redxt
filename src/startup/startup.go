@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/webappsgo/redxt/src/cli"
 	"github.com/webappsgo/redxt/src/common/banner"
@@ -32,7 +34,10 @@ import (
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/pidfile"
 	"github.com/webappsgo/redxt/src/security"
+	"github.com/webappsgo/redxt/src/server"
 	"github.com/webappsgo/redxt/src/signals"
+	"github.com/webappsgo/redxt/src/ssl"
+	"github.com/webappsgo/redxt/src/urlvars"
 )
 
 // setupTokenSecret is the app_secrets name under which the hash of the
@@ -87,12 +92,32 @@ type Server struct {
 	// SetupToken is the one-time first-run token. It is empty on every
 	// subsequent run and is never persisted in plaintext.
 	SetupToken string
+	// Started is the instant the sequence began, which the health
+	// document (PART 13) reports as the process uptime.
+	Started time.Time
+	// HTTP is the listener set from PART 14, held so shutdown can drain
+	// it before the databases behind it close.
+	HTTP *server.Server
+	// SSL is the certificate manager from PART 15. It is nil when no
+	// HTTPS listener is configured, and the scheduler's daily renewal
+	// check reads it once PART 19 is wired in.
+	SSL *ssl.Manager
+	// URLVars resolves the request-facing URL variables and the client
+	// address the middleware chain keys on.
+	URLVars *urlvars.Resolver
 
 	// pidPath is the PID file to remove on shutdown. It is empty when
 	// no PID file was written, which is always the case in a container.
 	pidPath string
 	// forceColor is the parsed --color flag: nil for auto-detection.
 	forceColor *bool
+	// shuttingDown reports that teardown has begun, so the health
+	// document answers "shutting_down" while connections drain.
+	shuttingDown bool
+	// acmeCancel stops a first-issuance attempt still in flight, and
+	// acmeWG waits for it, so no goroutine outlives shutdown.
+	acmeCancel context.CancelFunc
+	acmeWG     sync.WaitGroup
 }
 
 // Run executes the whole sequence and blocks until a shutdown signal
@@ -215,7 +240,10 @@ func statusCommand(ctx context.Context, opts *cli.Options, streams IO) int {
 func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) {
 	// Step 6: run context. The privilege level is locked the moment the
 	// paths package initializes, before anything can drop privileges.
-	s := &Server{Mode: mode.Resolve(opts.Mode, opts.DebugFlag())}
+	s := &Server{
+		Mode:    mode.Resolve(opts.Mode, opts.DebugFlag()),
+		Started: time.Now(),
+	}
 
 	// Step 7: resolve every path once, CLI flag over environment
 	// variable over OS default.
@@ -287,8 +315,14 @@ func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) 
 		return nil, s.unwind(err)
 	}
 
-	// Steps 16, 17, and 18 — the scheduler, the overlay networks, and
-	// the HTTP server — attach here, each owned by its own PART.
+	// Steps 16 and 17 — the scheduler and the overlay networks — attach
+	// here, each owned by its own PART.
+
+	// Step 18: the listeners, the middleware chain, and the certificate
+	// manager (PART 14 and PART 15).
+	if err := s.startHTTP(ctx); err != nil {
+		return nil, s.unwind(err)
+	}
 
 	if s.FirstRun {
 		token, err := s.ensureSetupToken(ctx)
@@ -384,13 +418,13 @@ func (s *Server) ensureSetupToken(ctx context.Context) (string, error) {
 
 // announce performs step 20.
 func (s *Server) announce(streams IO) {
-	url := fmt.Sprintf("http://%s:%d", s.Config.Server.Listen, s.Config.Server.Port)
+	urls := s.listenURLs()
 	banner.PrintStartupBanner(banner.BannerConfig{
 		AppName:    s.Config.Server.ApplicationName,
 		Version:    version.Version(),
 		AppMode:    string(s.Mode.Mode),
 		Debug:      s.Mode.Debug,
-		URLs:       []string{url},
+		URLs:       urls,
 		ShowSetup:  s.SetupToken != "",
 		SetupToken: s.SetupToken,
 		ForceColor: s.forceColor,
@@ -398,7 +432,9 @@ func (s *Server) announce(streams IO) {
 		Out:        streams.Out,
 	})
 
-	s.Log.Infof("Listening on %s:%d", s.Config.Server.Listen, s.Config.Server.Port)
+	for _, url := range urls {
+		s.Log.Infof("Listening on %s", url)
+	}
 	s.Log.Infof("Mode: %s", s.Mode.Mode)
 }
 
@@ -423,6 +459,14 @@ func (s *Server) dumpStatus() {
 // subsystem cannot strand the rest.
 func (s *Server) Shutdown() error {
 	var errs []error
+
+	// The listeners go first: no new request may arrive while the
+	// databases that would serve it are closing.
+	s.shuttingDown = true
+	if err := s.stopHTTP(); err != nil {
+		errs = append(errs, err)
+	}
+	s.SSL = nil
 
 	if s.UsersDB != nil {
 		errs = append(errs, s.UsersDB.Close())
@@ -474,6 +518,11 @@ func applyCLIOverrides(cfg *config.Config, opts *cli.Options) {
 	}
 	if ports, err := opts.Ports(); err == nil && len(ports) > 0 {
 		cfg.Server.Port = ports[0]
+		// A second --port value names the TLS listener, which PART 15
+		// keeps separate from the plaintext one.
+		if len(ports) > 1 {
+			cfg.Server.SSL.Port = ports[1]
+		}
 	}
 	if opts.BaseURL != "" {
 		cfg.Server.BaseURL = opts.BaseURL

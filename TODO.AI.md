@@ -65,11 +65,38 @@ Read: AI.md PART 13
 
 ## API and transport layer
 
-## [ ] Implement API structure (REST endpoints, routing, middleware)
+## [x] Implement API structure (REST endpoints, routing, middleware)
 Read: AI.md PART 14
 
-## [ ] Implement SSL/TLS & Let's Encrypt (ACME, cert storage, renewal)
+## [x] Implement SSL/TLS & Let's Encrypt (ACME, cert storage, renewal)
 Read: AI.md PART 15
+
+## [ ] Schedule the daily 03:00 certificate renewal check
+PART 15 requires app-managed certificates to renew 7 days before expiry on a
+daily 03:00 check. `ssl.Manager.RenewAll`, `ssl.RenewalWindow`, `ssl.RenewalHour`
+and `ssl.NextRenewalCheck` exist and are tested; nothing calls them yet because
+the scheduler is PART 19. Wire the job when PART 19 lands.
+Read: AI.md PART 15, PART 19
+
+## [ ] Mount the metrics, swagger, GraphQL, and admin handlers on the router
+`server.Routes` has a field per surface and the router mounts every documented
+path (including the unversioned aliases) the moment a field is non-nil. The
+fields are left nil until PARTs 17 and 21 supply the handlers, so those routes
+answer 404 rather than an empty success.
+Read: AI.md PART 14, PART 17, PART 21
+
+## [ ] Add the `server.metrics.root.enabled` config key
+The router mounts the root `/metrics` alias unconditionally when a metrics
+handler is supplied, but PART 21 describes the root alias as opt-in the way
+`server.healthz.root.enabled` is. Add the matching key and gate the alias on it
+when PART 21 is implemented.
+Read: AI.md PART 21
+
+## [ ] Publish the client version floor in the autodiscovery document
+PART 33 describes `cli_versions` and `cli_min_version` in the autodiscovery
+payload so a client can tell whether it must upgrade. `server.Autodiscovery`
+omits both because no client release channel exists yet.
+Read: AI.md PART 23, PART 33
 
 ## Accounts, orgs, and domains — route to go-auth-builder
 

@@ -1,6 +1,8 @@
 package apierror
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -95,7 +97,7 @@ func TestSendOK(t *testing.T) {
 			if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 				t.Fatalf("Content-Type = %q, want application/json", ct)
 			}
-			if got := strings.TrimSpace(rec.Body.String()); got != tt.want {
+			if got := compactJSON(t, rec.Body.String()); got != tt.want {
 				t.Fatalf("body = %s, want %s", got, tt.want)
 			}
 		})
@@ -141,7 +143,7 @@ func TestSendError(t *testing.T) {
 			if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 				t.Fatalf("Content-Type = %q, want application/json", ct)
 			}
-			if got := strings.TrimSpace(rec.Body.String()); got != tt.wantBody {
+			if got := compactJSON(t, rec.Body.String()); got != tt.wantBody {
 				t.Fatalf("body = %s, want %s", got, tt.wantBody)
 			}
 		})
@@ -182,8 +184,40 @@ func TestSendErrorCode(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusTooManyRequests)
 	}
 	want := `{"ok":false,"error":"RATE_LIMITED","message":"Too many requests"}`
-	if got := strings.TrimSpace(rec.Body.String()); got != want {
+	if got := compactJSON(t, rec.Body.String()); got != want {
 		t.Fatalf("body = %s, want %s", got, want)
+	}
+}
+
+// compactJSON strips the response formatting so a test can assert on the
+// document rather than on its whitespace.
+func compactJSON(t *testing.T, body string) string {
+	t.Helper()
+
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, []byte(body)); err != nil {
+		t.Fatalf("json.Compact(%q) error = %v", body, err)
+	}
+	return buf.String()
+}
+
+func TestSendOKUsesTheMandatedJSONFormatting(t *testing.T) {
+	// AI.md PART 14: every JSON response is indented with two spaces and
+	// ends in a single newline.
+	rec := httptest.NewRecorder()
+	if err := SendOK(rec, map[string]any{"id": "abc"}); err != nil {
+		t.Fatalf("SendOK returned error: %v", err)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "\n  \"ok\": true") {
+		t.Errorf("body is not indented with two spaces: %q", body)
+	}
+	if !strings.HasSuffix(body, "}\n") {
+		t.Errorf("body does not end in a single newline: %q", body)
+	}
+	if strings.HasSuffix(body, "\n\n") {
+		t.Errorf("body ends in more than one newline: %q", body)
 	}
 }
 

@@ -11,6 +11,24 @@ const (
 	DefaultApplicationTagline = "The Complete DNS Server"
 )
 
+// Default routing segments. AI.md PART 14 fixes the API version prefix
+// and PART 17 fixes the admin panel path; both stay configurable.
+const (
+	DefaultAPIVersion = "v1"
+	DefaultAdminPath  = "administration"
+)
+
+// DefaultHSTSMaxAge is the two-year max-age AI.md PART 15 requires on
+// the Strict-Transport-Security header.
+const DefaultHSTSMaxAge = 63072000
+
+// DefaultCSRFExemptPaths lists the route prefixes that never carry a
+// browser session cookie and therefore never need a CSRF token.
+var DefaultCSRFExemptPaths = []string{
+	"/api/",
+	"/.well-known/",
+}
+
 // defaultPortRangeLow and defaultPortRangeHigh bound the random
 // first-run port selection described in AI.md PART 5, Port Rules.
 const (
@@ -40,6 +58,32 @@ func DefaultConfig() *Config {
 			BaseURL:            "/",
 			ApplicationName:    DefaultApplicationName,
 			ApplicationTagline: DefaultApplicationTagline,
+			AdminPath:          DefaultAdminPath,
+			APIVersion:         DefaultAPIVersion,
+
+			SSL: SSL{
+				Enabled:    false,
+				MinVersion: "TLS1.2",
+				LetsEncrypt: LetsEncrypt{
+					Enabled:   false,
+					Challenge: "http-01",
+					Staging:   false,
+				},
+			},
+
+			Web: Web{
+				CORS: "*",
+				CSRF: CSRF{
+					Enabled:     true,
+					ExemptPaths: append([]string(nil), DefaultCSRFExemptPaths...),
+				},
+				HSTS: HSTS{
+					Enabled:           true,
+					MaxAge:            DefaultHSTSMaxAge,
+					IncludeSubdomains: true,
+					Preload:           true,
+				},
+			},
 
 			Limits: Limits{
 				MaxBodySize:  ByteSize(10 << 20),
@@ -170,7 +214,9 @@ func DefaultConfig() *Config {
 			},
 
 			Healthz: Healthz{
-				Root: true,
+				Root: HealthzRoot{
+					Enabled: false,
+				},
 			},
 		},
 	}

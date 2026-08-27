@@ -12,6 +12,8 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+
+	"github.com/webappsgo/redxt/src/common/i18n"
 )
 
 // Viewer is the signed-in account a page renders navigation for. A nil
@@ -28,7 +30,8 @@ type Page struct {
 	Title string
 	// AppName is the configured application name, shown in the header.
 	AppName string
-	// Language is the document language attribute.
+	// Language is the document language attribute, an i18n.Supported()
+	// code. Direction() derives dir="ltr"/"rtl" from it.
 	Language string
 	// Base is the web path prefix the page's links are built from.
 	Base string
@@ -44,6 +47,13 @@ type Page struct {
 	Data any
 }
 
+// Direction returns "rtl" for a right-to-left language (Arabic) and
+// "ltr" otherwise, for the document's dir="" attribute per PART 31
+// a11y requirements.
+func (p Page) Direction() string {
+	return i18n.Direction(p.Language)
+}
+
 // Set holds the parsed templates.
 type Set struct {
 	tpl *template.Template
@@ -55,7 +65,12 @@ type Set struct {
 // that will not parse is a startup failure the operator sees immediately
 // instead of a 500 the first visitor discovers.
 func New() (*Set, error) {
-	tpl, err := template.New("redxt").Parse(pages)
+	// Parse must see every function name the templates reference, so a
+	// placeholder FuncMap is bound here. Render below clones the
+	// parsed tree per request and rebinds t/tf/tp to the actual
+	// request language — Parse never runs again, only the cheap
+	// Clone+Funcs rebinding does.
+	tpl, err := template.New("redxt").Funcs(i18n.FuncMap(i18n.DefaultLanguage)).Parse(pages)
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +89,21 @@ func (s *Set) Has(name string) bool {
 // already committed to it.
 func (s *Set) Render(w http.ResponseWriter, status int, name string, data Page) error {
 	buf := &bufferWriter{}
-	if err := s.tpl.ExecuteTemplate(buf, name, data); err != nil {
+	// Clone shares the already-parsed tree (no re-parsing) and rebinds
+	// t/tf/tp to this request's language, so concurrent requests in
+	// different languages never race on a shared FuncMap.
+	rendered, err := s.tpl.Clone()
+	if err != nil {
+		return err
+	}
+	rendered = rendered.Funcs(i18n.FuncMap(data.Language))
+	if err := rendered.ExecuteTemplate(buf, name, data); err != nil {
 		return err
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, err := w.Write(buf.bytes)
+	_, err = w.Write(buf.bytes)
 	return err
 }
 

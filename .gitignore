@@ -106,6 +106,9 @@ $RECYCLE.BIN/
 binaries/
 releases/
 
+# Generated MkDocs site (built by ReadTheDocs, never committed)
+site/
+
 # Runtime volume data (NEVER commit)
 volumes/
 

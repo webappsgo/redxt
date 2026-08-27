@@ -80,6 +80,11 @@ type Server struct {
 	Orgs           Orgs           `yaml:"orgs"`
 	Features       Features       `yaml:"features"`
 	Notifications  Notifications  `yaml:"notifications"`
+	Scheduler      Scheduler      `yaml:"scheduler"`
+	GeoIP          GeoIP          `yaml:"geoip"`
+	Metrics        Metrics        `yaml:"metrics"`
+	Backup         Backup         `yaml:"backup"`
+	Update         Update         `yaml:"update"`
 }
 
 // Users holds server.users.* per AI.md PART 34 "Multi-User".
@@ -444,12 +449,34 @@ type RateBucket struct {
 	Window Duration `yaml:"window"`
 }
 
-// I18n holds server.i18n.* per PART 12 "Internationalization".
+// I18n holds server.i18n.* per PART 12 "Internationalization" and
+// PART 31 "I18N & A11Y". redxt ships translations for all 7 supported
+// languages (src/common/i18n) in every build; this section only
+// controls which of them are offered and how the active one is
+// selected, never which strings exist.
 type I18n struct {
-	// DefaultLanguage is the fallback language tag.
+	// Enabled turns on language selection (query param, cookie,
+	// Accept-Language). When false every request renders in
+	// DefaultLanguage regardless of visitor preference.
+	Enabled bool `yaml:"enabled"`
+	// DefaultLanguage is the language used when no visitor preference
+	// is detected.
 	DefaultLanguage string `yaml:"default_language"`
-	// Supported lists the language tags the server serves.
-	Supported []string `yaml:"supported"`
+	// Supported lists the language tags this deployment offers,
+	// server.i18n.available_languages in server.yml. A visitor
+	// requesting a language outside this list falls back to
+	// FallbackLanguage, never an error.
+	Supported []string `yaml:"available_languages"`
+	// FallbackLanguage is used when the active language is missing a
+	// key, or when a requested language isn't in Supported. Per PART
+	// 31 this is always resolvable — src/common/i18n additionally
+	// guarantees an English fallback beneath this one.
+	FallbackLanguage string `yaml:"fallback_language"`
+	// CookieName is the cookie `?lang=` persists the visitor's choice
+	// to.
+	CookieName string `yaml:"cookie_name"`
+	// CookieMaxAge is how long the language cookie lives.
+	CookieMaxAge Duration `yaml:"cookie_max_age"`
 }
 
 // Cache holds server.cache.* per PART 12 "Cache Configuration".
@@ -612,6 +639,171 @@ type HealthzRoot struct {
 	// Enabled mounts /healthz on the SAME handler as /server/healthz.
 	// It is never a redirect, and it defaults to false.
 	Enabled bool `yaml:"enabled"`
+}
+
+// Scheduler holds server.scheduler.* per AI.md PART 19. The scheduler
+// itself has no enable/disable switch — it always runs — but each
+// built-in task can be individually tuned or disabled unless the
+// task is marked non-skippable in PART 19's task table.
+type Scheduler struct {
+	// Timezone names the IANA zone every cron-style schedule below is
+	// evaluated in.
+	Timezone string `yaml:"timezone"`
+	// CatchUpWindow bounds how late a missed task may still run on
+	// startup; older misses are skipped rather than run.
+	CatchUpWindow Duration `yaml:"catch_up_window"`
+	// Tasks holds the per-task overrides keyed by task name (e.g.
+	// "backup_daily", "ssl_renewal"). A task absent from this map
+	// runs on its documented default schedule.
+	Tasks map[string]SchedulerTask `yaml:"tasks"`
+}
+
+// SchedulerTask holds one server.scheduler.tasks.{name}.* entry.
+type SchedulerTask struct {
+	// Schedule is a cron expression or an "@every"/"@hourly"-style
+	// shorthand.
+	Schedule string `yaml:"schedule"`
+	// Enabled toggles the task. Non-skippable tasks ignore false.
+	Enabled bool `yaml:"enabled"`
+	// RetryOnFail reschedules a failed run after RetryDelay instead
+	// of waiting for the next normal occurrence.
+	RetryOnFail bool `yaml:"retry_on_fail"`
+	// RetryDelay is how long to wait before a retried run.
+	RetryDelay Duration `yaml:"retry_delay"`
+	// Verify asks a backup task to run its post-creation verification
+	// checks before applying retention.
+	Verify bool `yaml:"verify"`
+	// RestartOnFail asks a health-check task to attempt a restart of
+	// the unhealthy component it monitors.
+	RestartOnFail bool `yaml:"restart_on_fail"`
+	// Retention holds server.scheduler.tasks.backup_daily.retention.*
+	// per AI.md PART 22.
+	Retention BackupRetention `yaml:"retention"`
+}
+
+// GeoIP holds server.geoip.* per AI.md PART 20. GeoIP is a risk
+// signal only and is never a sole access-control gate.
+type GeoIP struct {
+	// Enabled turns GeoIP lookups on. IDEA.md defaults this to false
+	// for redxt, overriding the generic spec default.
+	Enabled bool `yaml:"enabled"`
+	// Databases lists which ip-location-db categories to download
+	// (e.g. "country", "asn").
+	Databases []string `yaml:"databases"`
+	// UpdateSchedule is the cron expression the geoip_update task
+	// uses; it is also settable via server.scheduler.tasks.
+	CacheDir string `yaml:"cache_dir"`
+}
+
+// Metrics holds server.metrics.* per AI.md PART 21.
+type Metrics struct {
+	// Enabled turns the /server/metrics surface on.
+	Enabled bool `yaml:"enabled"`
+	// Root gates the optional root-level /metrics alias, mirroring
+	// Healthz.Root. The canonical route stays /server/metrics whether
+	// or not the alias is mounted.
+	Root MetricsRoot `yaml:"root"`
+	// Auth holds the per-service bearer tokens and the firewalled
+	// escape hatch.
+	Auth MetricsAuth `yaml:"auth"`
+	// IncludeSystem exports CPU/memory/disk gauges.
+	IncludeSystem bool `yaml:"include_system"`
+	// IncludeRuntime exports Go runtime gauges (goroutines, GC).
+	IncludeRuntime bool `yaml:"include_runtime"`
+	// Loki holds the loki service's recent-log-entry limits.
+	Loki MetricsLoki `yaml:"loki"`
+	// DurationBuckets are the histogram buckets, in seconds, for
+	// request-duration metrics.
+	DurationBuckets []float64 `yaml:"duration_buckets"`
+	// SizeBuckets are the histogram buckets, in bytes, for
+	// request/response-size metrics.
+	SizeBuckets []float64 `yaml:"size_buckets"`
+}
+
+// MetricsRoot holds server.metrics.root.* per AI.md PART 14/21.
+type MetricsRoot struct {
+	// Enabled mounts /metrics on the SAME handler as /server/metrics.
+	// It is never a redirect, and it defaults to true per PART 14.
+	Enabled bool `yaml:"enabled"`
+}
+
+// MetricsAuth holds server.metrics.auth.* per AI.md PART 21. Every
+// metrics route requires a bearer token; there is no unauthenticated
+// default outside the explicit escape hatch below.
+type MetricsAuth struct {
+	// AllowUnauthenticated skips token checks for every metrics
+	// service. Only for firewalled internal networks.
+	AllowUnauthenticated bool `yaml:"allow_unauthenticated"`
+	// Tokens holds the per-service bearer token. An empty entry
+	// disables that service's endpoints (403, empty body).
+	Tokens MetricsTokens `yaml:"tokens"`
+}
+
+// MetricsTokens holds the three per-service bearer tokens.
+type MetricsTokens struct {
+	Prometheus string `yaml:"prometheus"`
+	Grafana    string `yaml:"grafana"`
+	Loki       string `yaml:"loki"`
+}
+
+// MetricsLoki holds server.metrics.loki.* per AI.md PART 21.
+type MetricsLoki struct {
+	// MaxEntries bounds how many recent log lines the loki service
+	// keeps in memory.
+	MaxEntries int `yaml:"max_entries"`
+	// MaxAge bounds how old a kept log line may be.
+	MaxAge Duration `yaml:"max_age"`
+}
+
+// Backup holds server.backup.* per AI.md PART 22.
+type Backup struct {
+	Encryption BackupEncryption `yaml:"encryption"`
+	Compliance BackupCompliance `yaml:"compliance"`
+}
+
+// BackupEncryption holds server.backup.encryption.* per PART 22.
+type BackupEncryption struct {
+	// Enabled encrypts every backup with AES-256-GCM, key derived via
+	// Argon2id from the operator-supplied password.
+	Enabled bool `yaml:"enabled"`
+}
+
+// BackupCompliance holds server.backup.compliance.* per PART 22.
+type BackupCompliance struct {
+	// Enabled refuses to create an unencrypted backup at all.
+	Enabled bool `yaml:"enabled"`
+}
+
+// BackupRetention holds the retention limits from PART 22's
+// backup_daily task configuration.
+type BackupRetention struct {
+	// MaxBackups is how many daily full backups to keep, 1-365.
+	MaxBackups int `yaml:"max_backups"`
+	// KeepWeekly is how many Sunday backups to keep, 0-52 (0 disables).
+	KeepWeekly int `yaml:"keep_weekly"`
+	// KeepMonthly is how many 1st-of-month backups to keep, 0-12.
+	KeepMonthly int `yaml:"keep_monthly"`
+	// KeepYearly is how many January 1st backups to keep, 0-10.
+	KeepYearly int `yaml:"keep_yearly"`
+	// MaxTotalSize is a hard cap on total backup volume, as a percent
+	// ("10%") or an absolute size ("50G"). Empty/zero disables it.
+	// The cap overrides every count limit above.
+	MaxTotalSize string `yaml:"max_total_size"`
+}
+
+// Update holds server.update.* per AI.md PART 23.
+type Update struct {
+	// Branch is the release channel: stable, beta, or daily.
+	// Channels are cumulative — beta includes stable, daily includes
+	// beta and stable.
+	Branch string `yaml:"branch"`
+	// AutoInstall lets the update_check task install and restart
+	// automatically instead of only notifying Server Admins.
+	AutoInstall bool `yaml:"auto_install"`
+	// DeferDays delays a version's eligibility for the scheduled
+	// check by this many days after its release; manual commands
+	// always see the true latest regardless of this setting.
+	DeferDays int `yaml:"defer_days"`
 }
 
 // Contact holds server.contact.* per PART 12 "Contact Configuration".

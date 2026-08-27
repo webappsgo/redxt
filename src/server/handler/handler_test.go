@@ -330,12 +330,16 @@ func TestWrongPasswordAndUnknownAccountAnswerIdentically(t *testing.T) {
 func errorMessage(t *testing.T, body string) string {
 	t.Helper()
 
-	const open = `<p class="error">`
-	start := strings.Index(body, open)
-	if start < 0 {
+	const marker = `class="error"`
+	markerAt := strings.Index(body, marker)
+	if markerAt < 0 {
 		t.Fatalf("page carries no error message: %s", body)
 	}
-	rest := body[start+len(open):]
+	tagEnd := strings.Index(body[markerAt:], ">")
+	if tagEnd < 0 {
+		t.Fatalf("unterminated error tag: %s", body)
+	}
+	rest := body[markerAt+tagEnd+1:]
 	end := strings.Index(rest, "</p>")
 	if end < 0 {
 		t.Fatalf("unterminated error message: %s", body)

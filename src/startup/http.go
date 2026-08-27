@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/webappsgo/redxt/src/config"
 	"github.com/webappsgo/redxt/src/health"
+	"github.com/webappsgo/redxt/src/metrics"
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/server"
 	"github.com/webappsgo/redxt/src/server/admin"
@@ -57,7 +59,7 @@ func (s *Server) startHTTP(ctx context.Context) error {
 		Log:          s.Log,
 		Mode:         string(s.Mode.Mode),
 		Debug:        s.Mode.Debug,
-		Routes:       mergeAdminRoutes(userRoutes(users), adminHandler),
+		Routes:       s.mergeMetricsRoute(mergeAdminRoutes(userRoutes(users), adminHandler)),
 		Middleware:   s.middleware(users),
 		TLS:          s.tlsProvider(),
 		HealthProbe:  s.healthProbe,
@@ -114,7 +116,11 @@ func (s *Server) middleware(users *handler.Handler) func(http.Handler) http.Hand
 		opts.Auth.IsPublicPath = users.IsPublicPath
 	}
 
-	return middleware.New(opts)
+	chain := middleware.New(opts)
+	metricsChain := metrics.Middleware(s.Metrics, s.Config.Server.Metrics.DurationBuckets, s.Config.Server.Metrics.SizeBuckets)
+	return func(next http.Handler) http.Handler {
+		return metricsChain(chain(next))
+	}
 }
 
 // userRoutes places the Regular User surfaces in the router's route
@@ -137,6 +143,16 @@ func mergeAdminRoutes(routes server.Routes, panel *admin.Handler) server.Routes 
 	if panel != nil {
 		routes.Admin = panel.Web()
 	}
+	return routes
+}
+
+// mergeMetricsRoute adds the PART 21 metrics surface to an existing
+// route table. s.Metrics is always non-nil by the time startHTTP runs
+// (startMetrics is Step 16, ahead of Step 18), so this only decides
+// which per-service token gates each request.
+func (s *Server) mergeMetricsRoute(routes server.Routes) server.Routes {
+	routes.Metrics = metrics.NewHandler(s.Metrics, paths.ProjectName(), s.Config.Server.ApplicationName, s.MetricsLoki,
+		func() config.MetricsAuth { return s.Config.Server.Metrics.Auth })
 	return routes
 }
 

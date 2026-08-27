@@ -3,7 +3,10 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
+	"github.com/webappsgo/redxt/src/common/i18n"
+	"github.com/webappsgo/redxt/src/config"
 	"github.com/webappsgo/redxt/src/security"
 	"github.com/webappsgo/redxt/src/server/admin"
 	"github.com/webappsgo/redxt/src/server/middleware"
@@ -109,17 +112,31 @@ func (h *Handler) csrfToken(w http.ResponseWriter, r *http.Request) string {
 	return token
 }
 
+// requestLanguage resolves the active language for r per PART 31's
+// fallback chain (query param -> cookie -> Accept-Language -> default),
+// or always the configured default when i18n is disabled. A `?lang=`
+// query parameter persists the choice via cookie so it survives past
+// the current request, per PART 31's "Language Selection via Query
+// Parameter".
+func requestLanguage(cfg *config.Config, w http.ResponseWriter, r *http.Request) string {
+	if !cfg.Server.I18n.Enabled {
+		return cfg.Server.I18n.DefaultLanguage
+	}
+	lang := i18n.LangFromRequestCookie(r, cfg.Server.I18n.CookieName)
+	if q := r.URL.Query().Get("lang"); q != "" && i18n.IsSupported(strings.ToLower(strings.TrimSpace(q))) {
+		i18n.SetLanguageCookieNamed(w, cfg.Server.I18n.CookieName, lang, cfg.Server.I18n.CookieMaxAge.Duration())
+	}
+	return lang
+}
+
 // page builds the data every template receives.
 func (h *Handler) page(w http.ResponseWriter, r *http.Request, title string, data any) template.Page {
 	p := template.Page{
 		Title:    title,
 		AppName:  h.config.Server.ApplicationName,
-		Language: h.config.Server.I18n.DefaultLanguage,
+		Language: requestLanguage(h.config, w, r),
 		CSRF:     h.csrfToken(w, r),
 		Data:     data,
-	}
-	if p.Language == "" {
-		p.Language = "en"
 	}
 	if c, ok := currentUser(r); ok {
 		if account, err := h.svc.User(r.Context(), c.UserID); err == nil {

@@ -30,9 +30,11 @@ import (
 	"github.com/webappsgo/redxt/src/daemon"
 	"github.com/webappsgo/redxt/src/database"
 	"github.com/webappsgo/redxt/src/logging"
+	"github.com/webappsgo/redxt/src/metrics"
 	"github.com/webappsgo/redxt/src/mode"
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/pidfile"
+	"github.com/webappsgo/redxt/src/scheduler"
 	"github.com/webappsgo/redxt/src/security"
 	"github.com/webappsgo/redxt/src/server"
 	"github.com/webappsgo/redxt/src/signals"
@@ -99,6 +101,17 @@ type Server struct {
 	// URLVars resolves the request-facing URL variables and the client
 	// address the middleware chain keys on.
 	URLVars *urlvars.Resolver
+	// Metrics is the PART 21 registry every HTTP request, task run, and
+	// database pool reports to. It is always non-nil; PART 21's
+	// per-service bearer tokens gate who can read it, not whether it
+	// exists.
+	Metrics *metrics.Registry
+	// MetricsLoki backs the PART 21 loki metrics service with a bounded
+	// window of recent log lines.
+	MetricsLoki *metrics.LokiBuffer
+	// scheduler is the PART 19 internal task runner, held so Shutdown
+	// can drain it before the databases it writes to close.
+	scheduler *scheduler.Scheduler
 
 	// pidPath is the PID file to remove on shutdown. It is empty when
 	// no PID file was written, which is always the case in a container.
@@ -324,12 +337,21 @@ func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) 
 		return nil, s.unwind(err)
 	}
 
-	// Steps 16 and 17 — the scheduler and the overlay networks — attach
-	// here, each owned by its own PART.
+	// Step 16: the PART 21 metrics registry, so every subsystem started
+	// after this point (the scheduler, then the HTTP middleware chain)
+	// has somewhere to report to.
+	s.startMetrics()
 
 	// Step 18: the listeners, the middleware chain, and the certificate
 	// manager (PART 14 and PART 15).
 	if err := s.startHTTP(ctx); err != nil {
+		return nil, s.unwind(err)
+	}
+
+	// Step 17 (attached after HTTP so ssl_renewal can find s.SSL): the
+	// PART 19 internal scheduler. The overlay networks (PART 32) are
+	// not yet wired in.
+	if err := s.startScheduler(ctx); err != nil {
 		return nil, s.unwind(err)
 	}
 
@@ -472,6 +494,9 @@ func (s *Server) Shutdown() error {
 	// The listeners go first: no new request may arrive while the
 	// databases that would serve it are closing.
 	s.shuttingDown = true
+	if err := s.stopScheduler(); err != nil {
+		errs = append(errs, err)
+	}
 	if err := s.stopHTTP(); err != nil {
 		errs = append(errs, err)
 	}

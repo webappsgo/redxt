@@ -6,6 +6,7 @@ import (
 
 	"github.com/webappsgo/redxt/src/apierror"
 	"github.com/webappsgo/redxt/src/common/httputil"
+	"github.com/webappsgo/redxt/src/common/i18n"
 )
 
 // TextWidth is the column width the HTML-to-text converter renders at.
@@ -67,9 +68,13 @@ func WriteNegotiated(w http.ResponseWriter, r *http.Request, o Options, negotiat
 		_, _ = w.Write([]byte(text))
 
 	case httputil.FormatHTML:
+		lang := i18n.DefaultLanguage
+		if o.Config.Server.I18n.Enabled {
+			lang = i18n.LangFromRequestCookie(r, o.Config.Server.I18n.CookieName)
+		}
 		w.Header().Set("Content-Type", httputil.FormatHTML.ContentType())
 		w.WriteHeader(status)
-		_, _ = w.Write([]byte(HTMLDocument(o, p)))
+		_, _ = w.Write([]byte(HTMLDocument(o, p, lang)))
 
 	default:
 		w.Header().Set("Content-Type", httputil.FormatJSON.ContentType())
@@ -151,20 +156,42 @@ td, th {
   border-bottom: 1px solid var(--accent);
   padding: 0.25rem 0.5rem;
   text-align: left;
+}
+.skip-link {
+  background: var(--bg);
+  color: var(--fg);
+  left: 0.5rem;
+  padding: 0.5rem 1rem;
+  position: absolute;
+  top: -3rem;
+  transition: top 0.15s ease-in-out;
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }`
 
 // HTMLDocument wraps a body fragment in a complete, mobile-first
 // document. Every page the server renders goes through here so the
-// viewport, language, and theme are never forgotten on one route.
-func HTMLDocument(o Options, p Payload) string {
+// viewport, language, and theme are never forgotten on one route. lang
+// is an i18n.Supported() code; an unsupported or empty value falls
+// back to i18n.DefaultLanguage rather than erroring.
+func HTMLDocument(o Options, p Payload, lang string) string {
 	title := p.Title
 	if title == "" {
 		title = o.Config.Server.ApplicationName
 	}
+	if !i18n.IsSupported(lang) {
+		lang = i18n.DefaultLanguage
+	}
 
 	var b strings.Builder
 	b.WriteString("<!DOCTYPE html>\n")
-	b.WriteString(`<html lang="` + escapeHTML(o.Config.Server.I18n.DefaultLanguage) + `">` + "\n")
+	b.WriteString(`<html lang="` + escapeHTML(lang) + `" dir="` + i18n.Direction(lang) + `">` + "\n")
 	b.WriteString("<head>\n")
 	b.WriteString(`  <meta charset="utf-8">` + "\n")
 	b.WriteString(`  <meta name="viewport" content="width=device-width, initial-scale=1">` + "\n")
@@ -172,10 +199,13 @@ func HTMLDocument(o Options, p Payload) string {
 	b.WriteString("  <style>\n" + pageStyle + "\n  </style>\n")
 	b.WriteString("</head>\n")
 	b.WriteString("<body>\n")
+	b.WriteString(`<a class="skip-link" href="#main-content">` + escapeHTML(i18n.Translate(lang, "a11y.skip_to_content")) + "</a>\n")
+	b.WriteString(`<main id="main-content">` + "\n")
 	b.WriteString(p.HTML)
 	if !strings.HasSuffix(p.HTML, "\n") {
 		b.WriteString("\n")
 	}
+	b.WriteString("</main>\n")
 	b.WriteString("</body>\n")
 	b.WriteString("</html>\n")
 	return b.String()

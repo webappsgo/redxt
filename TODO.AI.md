@@ -196,38 +196,122 @@ Test coverage (Docker, `go test ./src/client/... ./src/agent/... -cover`):
 
 ## Operational and platform PARTs (no cross-dependencies beyond the foundation)
 
-## [ ] Implement scheduler
+## [x] Implement scheduler
 Read: AI.md PART 19
+`src/scheduler` (cron parsing, persistence, cluster-aware locking via
+`cluster_locks`, retry-once-on-fail, catch-up-window resume) implemented
+and wired into `src/startup/scheduler.go`. Registered tasks:
+session_cleanup, token_cleanup, log_rotation, cluster_heartbeat,
+healthcheck_self, ssl_renewal. Coverage 86.1%, `-race` clean.
+
+## [ ] Register remaining scheduler tasks once their owning packages exist
+Read: AI.md PART 19
+`geoip_update`, `blocklist_update`, `cve_update`, `update_check`,
+`backup_daily`, `backup_hourly`, `tor_health`, `i2p_health` are already
+defined in `config.defaultSchedulerTasks()` and seeded into
+`scheduler_tasks` for admin-panel display, but have no registered
+handler in `src/startup/scheduler.go` — each is blocked on its owning
+package below (GeoIP, backup, update, Tor/I2P health) landing first.
+
+## [ ] Add a driver-specific branch to the scheduler's cluster lock once non-SQLite drivers exist
+Read: AI.md PART 19, PART 10
+`src/scheduler/lock.go`'s `acquireLock`/`releaseLock` use a single
+atomic SQLite UPSERT (`INSERT ... ON CONFLICT DO UPDATE ... WHERE`).
+This is correct and sufficient today because SQLite is the only
+compiled driver (see `src/database/db.go`), but PostgreSQL support
+will need `pg_try_advisory_xact_lock` (or equivalent) instead.
 
 ## [ ] Implement GeoIP
 Read: AI.md PART 20
+`src/geoip`: MMDB download from the ip-location-db CDN, lookup, risk
+signal only (never a sole access gate), private-IP exclusion, disabled
+by default per IDEA.md. Dependency decision (maxminddb-golang vs
+hand-rolled MMDB reader) not yet made.
 
-## [ ] Implement metrics
+## [x] Implement metrics
 Read: AI.md PART 21
+`src/metrics` (hand-rolled Prometheus-compatible registry — no
+`client_golang` dependency; text/Grafana-JSON/Loki-JSON exposition,
+`Middleware`, per-service bearer auth) implemented and wired into
+`src/startup/http.go` (request middleware + `/server/metrics*` routes)
+and `src/startup/metrics.go` (`RegisterApp`, `RegisterDBStatsSource`
+for both databases). Coverage 98.4%, `-race` clean.
+
+## [ ] Wire auth_attempts_total / auth_sessions_active into the auth verifier
+Read: AI.md PART 21
+`metrics.Registry.RecordAuthAttempt`/`SetActiveSessions` exist and are
+tested, but nothing in `src/server/handler`'s auth verifier calls them
+yet.
 
 ## [ ] Implement backup & restore
 Read: AI.md PART 22
+`src/backup`: create/verify/restore against the existing `backups`
+table, AES-256-GCM + Argon2id encryption reusing `src/security`
+primitives, retention sweep, compliance-mode enforcement (config
+validation for this already exists in `config.validateBackup`).
 
 ## [ ] Implement update command
 Read: AI.md PART 23
+`src/update`: GitHub Releases API, stable/beta/daily channels, SHA-256
+checksum + signature verification, platform-specific binary
+replacement, service-aware restart.
 
 ## [ ] Implement privilege escalation & service integration
 Read: AI.md PART 24
+`src/service`: per-OS escalation detection, dedicated system user
+creation, privilege drop after binding a privileged port.
 
 ## [ ] Implement service support
 Read: AI.md PART 25
+Completes PART 24: systemd/OpenRC/SysVinit/runit/rc.d/launchd/Windows
+SCM install/uninstall/disable, `--service --install/--uninstall/--disable`
+CLI flags dispatched from `src/cli/flags.go`.
 
-## [ ] Implement testing & development tooling
+## [x] Implement testing & development tooling
 Read: AI.md PART 29
+`tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh`, `tests/e2e.sh`
+implemented and verified.
 
-## [ ] Implement ReadTheDocs documentation
+## [x] Implement ReadTheDocs documentation
 Read: AI.md PART 30
+`mkdocs.yml`, `.readthedocs.yaml`, `docs/requirements.txt`, and theme CSS
+implemented; verified via `mkdocs build --strict`.
 
-## [ ] Implement i18n & a11y
+## [ ] Implement i18n & a11y — remaining surfaces
 Read: AI.md PART 31
+Done this pass: a real, tested `src/common/i18n` engine (fallback chain,
+CLDR plural categories for all 7 languages with boundary tests, missing
+key/unsupported-language fallback to English, literal `{var}`
+interpolation, `html/template` FuncMap); the full `server.i18n.*` config
+block wired into `src/config` with validation; request-scoped language
+resolution (`?lang=` sets cookie, cookie, `Accept-Language`, default) in
+both `src/server/handler` and `src/server/admin`; `dir="rtl"/"ltr"`,
+skip links, `:focus-visible` outlines, `role="status"/"alert"
+aria-live`, and 44px touch targets applied to the shared page shell
+(`src/server/template/pages.go`) and the raw-HTML error builder
+(`src/server/render.go`); the nav chrome and login page translated as a
+working example of the `{{t ...}}` pattern.
+Deferred (not started this pass, no code stubs written per PART 1):
+translating the remaining `src/server/template/pages.go` UI strings
+beyond nav/login; API error/validation message translation; Swagger and
+GraphQL description translation; email template translation
+(depends on the notifications/email builder's template layer);
+server/CLI/agent output translation; date/time/number formatting;
+build-time key-validation wiring into CI (the `Keys()`/`MissingKeys()`
+functions exist but nothing calls them at build time yet); the
+remaining a11y subsections (focus management beyond `:focus-visible`,
+screen-reader announcements beyond the two ARIA live regions added,
+color-contrast audit, keyboard shortcuts, a11y testing requirements).
 
 ## [ ] Implement overlay networks (Tor & I2P)
 Read: AI.md PART 32
+Not started. `src/config`'s `Tor` struct remains the pre-existing narrow
+placeholder (`OnionAddress`, `ContactEmail` only) — no detection,
+process-supervisor, or I2P config work has been done. Blocking
+dependency: none technical: this needs its own implementation pass,
+including a real Tor-binary-detection + hidden-service supervisor (with
+`-race` coverage once goroutines are introduced) and an opt-in-only
+`features.i2p.enabled` config path, per the "never auto-enable I2P" rule.
 
 ## [ ] Reconcile PART 36 custom-domain routes with the spec tables
 Read: AI.md PART 36 (route tables, approx. lines 62775-62849)

@@ -102,14 +102,20 @@ func NewRouter(o Options) *http.ServeMux {
 		mount(mux, "GET", routes.Metrics,
 			"/server/metrics",
 			"/server/metrics/{service}",
-			// The root alias defaults to enabled per PART 14.
-			"/metrics",
-			"/metrics/{service}",
 			"/api/metrics",
 			"/api/metrics/{service}",
 			api+"/server/metrics",
 			api+"/server/metrics/{service}",
 		)
+		// The root alias defaults to enabled per PART 14, but stays
+		// gated the same way /healthz is, on the same handler value
+		// rather than a redirect.
+		if o.Config.Server.Metrics.Root.Enabled {
+			mount(mux, "GET", routes.Metrics,
+				"/metrics",
+				"/metrics/{service}",
+			)
+		}
 	}
 
 	if routes.Admin != nil {

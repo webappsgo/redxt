@@ -60,8 +60,138 @@ func (c *Config) Validate() bool {
 	c.validateOrgs(def)
 	c.validateCustomDomains(def)
 	c.validateNotifications(def)
+	c.validateScheduler(def)
+	c.validateGeoIP(def)
+	c.validateMetrics(def)
+	c.validateBackup(def)
+	c.validateUpdate(def)
 
 	return len(c.warnings) != before
+}
+
+// validateScheduler checks server.scheduler.* per AI.md PART 19. The
+// scheduler itself has no on/off switch, so this only normalizes the
+// timezone, catch-up window, and each task's retention numbers.
+func (c *Config) validateScheduler(def *Config) {
+	s := &c.Server.Scheduler
+
+	if s.Timezone == "" {
+		s.Timezone = def.Server.Scheduler.Timezone
+	} else if _, err := time.LoadLocation(s.Timezone); err != nil {
+		c.warnf("invalid scheduler.timezone %q, using %q", s.Timezone, def.Server.Scheduler.Timezone)
+		s.Timezone = def.Server.Scheduler.Timezone
+	}
+
+	if s.CatchUpWindow < 0 {
+		c.warnf("invalid scheduler.catch_up_window %v, using %v", s.CatchUpWindow, def.Server.Scheduler.CatchUpWindow)
+		s.CatchUpWindow = def.Server.Scheduler.CatchUpWindow
+	}
+
+	if s.Tasks == nil {
+		s.Tasks = defaultSchedulerTasks()
+		return
+	}
+	defaults := defaultSchedulerTasks()
+	for name, defTask := range defaults {
+		task, ok := s.Tasks[name]
+		if !ok {
+			s.Tasks[name] = defTask
+			continue
+		}
+		if task.Schedule == "" {
+			task.Schedule = defTask.Schedule
+		}
+		c.validateBackupRetention(&task.Retention, defTask.Retention, name)
+		s.Tasks[name] = task
+	}
+}
+
+// validateBackupRetention checks the numeric retention limits from
+// AI.md PART 22. Every threshold here is a warn-not-error ceiling:
+// an operator may exceed it deliberately, but redxt flags the choice.
+func (c *Config) validateBackupRetention(r *BackupRetention, def BackupRetention, task string) {
+	if r.MaxBackups <= 0 {
+		r.MaxBackups = def.MaxBackups
+	} else if r.MaxBackups > 7 {
+		c.warnf("scheduler.tasks.%s.retention.max_backups %d exceeds the recommended ceiling of 7", task, r.MaxBackups)
+	}
+	if r.KeepWeekly < 0 {
+		r.KeepWeekly = def.KeepWeekly
+	} else if r.KeepWeekly > 8 {
+		c.warnf("scheduler.tasks.%s.retention.keep_weekly %d exceeds the recommended ceiling of 8", task, r.KeepWeekly)
+	}
+	if r.KeepMonthly < 0 {
+		r.KeepMonthly = def.KeepMonthly
+	} else if r.KeepMonthly > 12 {
+		c.warnf("scheduler.tasks.%s.retention.keep_monthly %d exceeds the recommended ceiling of 12", task, r.KeepMonthly)
+	}
+	if r.KeepYearly < 0 {
+		r.KeepYearly = def.KeepYearly
+	} else if r.KeepYearly > 2 {
+		c.warnf("scheduler.tasks.%s.retention.keep_yearly %d exceeds the recommended ceiling of 2", task, r.KeepYearly)
+	}
+	if r.MaxTotalSize == "" {
+		r.MaxTotalSize = def.MaxTotalSize
+	}
+}
+
+// validateGeoIP checks server.geoip.* per AI.md PART 20. GeoIP stays
+// disabled unless explicitly turned on, per IDEA.md's override of the
+// generic spec default.
+func (c *Config) validateGeoIP(def *Config) {
+	g := &c.Server.GeoIP
+	if len(g.Databases) == 0 {
+		g.Databases = append([]string(nil), def.Server.GeoIP.Databases...)
+	}
+}
+
+// validateMetrics checks server.metrics.* per AI.md PART 21. Tokens
+// are free-form secrets and are never checked for shape; an empty
+// token simply disables that service per PART 21's "empty token =
+// service disabled" rule.
+func (c *Config) validateMetrics(def *Config) {
+	m := &c.Server.Metrics
+
+	if m.Loki.MaxEntries <= 0 {
+		m.Loki.MaxEntries = def.Server.Metrics.Loki.MaxEntries
+	}
+	if m.Loki.MaxAge <= 0 {
+		m.Loki.MaxAge = def.Server.Metrics.Loki.MaxAge
+	}
+	if len(m.DurationBuckets) == 0 {
+		m.DurationBuckets = append([]float64(nil), def.Server.Metrics.DurationBuckets...)
+	}
+	if len(m.SizeBuckets) == 0 {
+		m.SizeBuckets = append([]float64(nil), def.Server.Metrics.SizeBuckets...)
+	}
+}
+
+// validateBackup checks server.backup.* per AI.md PART 22. Compliance
+// mode forces encryption on: an operator cannot both require
+// compliance and disable encryption.
+func (c *Config) validateBackup(def *Config) {
+	_ = def
+	b := &c.Server.Backup
+	if b.Compliance.Enabled && !b.Encryption.Enabled {
+		c.warnf("backup.compliance.enabled requires backup.encryption.enabled; enabling encryption")
+		b.Encryption.Enabled = true
+	}
+}
+
+// validateUpdate checks server.update.* per AI.md PART 23.
+func (c *Config) validateUpdate(def *Config) {
+	u := &c.Server.Update
+	validBranches := []string{"stable", "beta", "daily"}
+	if u.Branch == "" {
+		u.Branch = def.Server.Update.Branch
+	} else if !contains(validBranches, strings.ToLower(u.Branch)) {
+		c.warnf("invalid update.branch %q, using %q", u.Branch, def.Server.Update.Branch)
+		u.Branch = def.Server.Update.Branch
+	}
+	if u.DeferDays < 0 {
+		c.warnf("invalid update.defer_days %d, using %d", u.DeferDays, def.Server.Update.DeferDays)
+		u.DeferDays = def.Server.Update.DeferDays
+	}
 }
 
 // validateNotifications checks the PART 18 toast position, toast
@@ -533,14 +663,31 @@ func (c *Config) validateI18n(def *Config) {
 
 	if len(i.Supported) == 0 {
 		i.Supported = []string{i.DefaultLanguage}
-		return
+	} else {
+		for n, lang := range i.Supported {
+			i.Supported[n] = strings.ToLower(strings.TrimSpace(lang))
+		}
+		if !contains(i.Supported, i.DefaultLanguage) {
+			c.warnf("server.i18n.default_language %q missing from available_languages, adding it", i.DefaultLanguage)
+			i.Supported = append([]string{i.DefaultLanguage}, i.Supported...)
+		}
 	}
-	for n, lang := range i.Supported {
-		i.Supported[n] = strings.ToLower(strings.TrimSpace(lang))
+
+	if strings.TrimSpace(i.FallbackLanguage) == "" {
+		i.FallbackLanguage = def.Server.I18n.FallbackLanguage
 	}
-	if !contains(i.Supported, i.DefaultLanguage) {
-		c.warnf("server.i18n.default_language %q missing from supported list, adding it", i.DefaultLanguage)
-		i.Supported = append([]string{i.DefaultLanguage}, i.Supported...)
+	i.FallbackLanguage = strings.ToLower(i.FallbackLanguage)
+	if !contains(i.Supported, i.FallbackLanguage) {
+		c.warnf("server.i18n.fallback_language %q missing from available_languages, adding it", i.FallbackLanguage)
+		i.Supported = append(i.Supported, i.FallbackLanguage)
+	}
+
+	if strings.TrimSpace(i.CookieName) == "" {
+		i.CookieName = def.Server.I18n.CookieName
+	}
+	if i.CookieMaxAge <= 0 {
+		c.warnf("invalid server.i18n.cookie_max_age %v, using %v", i.CookieMaxAge, def.Server.I18n.CookieMaxAge)
+		i.CookieMaxAge = def.Server.I18n.CookieMaxAge
 	}
 }
 

@@ -176,8 +176,12 @@ func DefaultConfig() *Config {
 			},
 
 			I18n: I18n{
-				DefaultLanguage: "en",
-				Supported:       []string{"en"},
+				Enabled:          true,
+				DefaultLanguage:  "en",
+				Supported:        []string{"en", "es", "zh", "fr", "ar", "de", "ja"},
+				FallbackLanguage: "en",
+				CookieName:       "lang",
+				CookieMaxAge:     Duration(365 * 24 * time.Hour),
 			},
 
 			Cache: Cache{
@@ -336,7 +340,98 @@ func DefaultConfig() *Config {
 					Events: defaultNotificationEvents(),
 				},
 			},
+
+			Scheduler: Scheduler{
+				Timezone:      DefaultSchedulerTimezone,
+				CatchUpWindow: Duration(time.Hour),
+				Tasks:         defaultSchedulerTasks(),
+			},
+
+			GeoIP: GeoIP{
+				Enabled:   false,
+				Databases: append([]string(nil), DefaultGeoIPDatabases...),
+			},
+
+			Metrics: Metrics{
+				Enabled: true,
+				Root: MetricsRoot{
+					Enabled: true,
+				},
+				Auth: MetricsAuth{
+					AllowUnauthenticated: false,
+				},
+				IncludeSystem:   true,
+				IncludeRuntime:  true,
+				Loki:            MetricsLoki{MaxEntries: 1000, MaxAge: Duration(time.Hour)},
+				DurationBuckets: append([]float64(nil), DefaultMetricsDurationBuckets...),
+				SizeBuckets:     append([]float64(nil), DefaultMetricsSizeBuckets...),
+			},
+
+			Backup: Backup{
+				Encryption: BackupEncryption{
+					Enabled: true,
+				},
+				Compliance: BackupCompliance{
+					Enabled: false,
+				},
+			},
+
+			Update: Update{
+				Branch:      DefaultUpdateBranch,
+				AutoInstall: false,
+				DeferDays:   0,
+			},
 		},
+	}
+}
+
+// DefaultSchedulerTimezone is the first-run scheduler.timezone value,
+// per AI.md PART 19.
+const DefaultSchedulerTimezone = "America/New_York"
+
+// DefaultGeoIPDatabases lists the ip-location-db categories fetched
+// when GeoIP is enabled, per AI.md PART 20.
+var DefaultGeoIPDatabases = []string{"country", "asn"}
+
+// DefaultUpdateBranch is the first-run release channel, per AI.md
+// PART 23.
+const DefaultUpdateBranch = "stable"
+
+// DefaultMetricsDurationBuckets are the request-duration histogram
+// buckets, in seconds, per AI.md PART 21.
+var DefaultMetricsDurationBuckets = []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+
+// DefaultMetricsSizeBuckets are the request/response-size histogram
+// buckets, in bytes, per AI.md PART 21.
+var DefaultMetricsSizeBuckets = []float64{100, 1000, 10000, 100000, 1000000, 10000000}
+
+// defaultSchedulerTasks returns the built-in task table from AI.md
+// PART 19 "Task Configuration", so every task has a documented
+// schedule even before an operator touches server.yml.
+func defaultSchedulerTasks() map[string]SchedulerTask {
+	return map[string]SchedulerTask{
+		"ssl_renewal":      {Schedule: "0 3 * * *", Enabled: true},
+		"geoip_update":     {Schedule: "0 3 * * 0", Enabled: true},
+		"blocklist_update": {Schedule: "0 4 * * *", Enabled: true, RetryOnFail: true, RetryDelay: Duration(time.Hour)},
+		"cve_update":       {Schedule: "0 5 * * *", Enabled: true, RetryOnFail: true, RetryDelay: Duration(time.Hour)},
+		"update_check":     {Schedule: "0 6 * * *", Enabled: true},
+		"session_cleanup":  {Schedule: "@every 15m", Enabled: true},
+		"token_cleanup":    {Schedule: "@every 15m", Enabled: true},
+		"log_rotation":     {Schedule: "0 0 * * *", Enabled: true},
+		"backup_daily": {
+			Schedule: "0 2 * * *",
+			Enabled:  true,
+			Verify:   true,
+			Retention: BackupRetention{
+				MaxBackups:   1,
+				MaxTotalSize: "10%",
+			},
+		},
+		"backup_hourly":     {Schedule: "@hourly", Enabled: false},
+		"healthcheck_self":  {Schedule: "@every 5m", Enabled: true},
+		"tor_health":        {Schedule: "@every 10m", Enabled: true, RestartOnFail: true},
+		"i2p_health":        {Schedule: "@every 10m", Enabled: true, RestartOnFail: true},
+		"cluster_heartbeat": {Schedule: "@every 30s", Enabled: true},
 	}
 }
 

@@ -224,7 +224,7 @@ func TestIsAPIPath(t *testing.T) {
 func TestHTMLDocument(t *testing.T) {
 	o := testOptions(t)
 
-	doc := HTMLDocument(o, Payload{HTML: "<p>body</p>\n", Title: "Zones"})
+	doc := HTMLDocument(o, Payload{HTML: "<p>body</p>\n", Title: "Zones"}, "en")
 
 	for _, want := range []string{
 		"<!DOCTYPE html>",
@@ -245,7 +245,7 @@ func TestHTMLDocument(t *testing.T) {
 func TestHTMLDocumentFallsBackToTheApplicationName(t *testing.T) {
 	o := testOptions(t)
 
-	doc := HTMLDocument(o, Payload{HTML: "<p>body</p>\n"})
+	doc := HTMLDocument(o, Payload{HTML: "<p>body</p>\n"}, "en")
 
 	want := "<title>" + escapeHTML(o.Config.Server.ApplicationName) + "</title>"
 	if !strings.Contains(doc, want) {

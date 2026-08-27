@@ -8,7 +8,7 @@ package template
 // long values wrap rather than pushing a phone layout sideways.
 const pages = `
 {{define "head"}}<!DOCTYPE html>
-<html lang="{{.Language}}">
+<html lang="{{.Language}}" dir="{{.Direction}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -78,33 +78,64 @@ td, th { border-bottom: 1px solid var(--line); padding: 0.35rem 0.5rem; text-ali
 .notice { border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; }
 .error { border-left: 3px solid var(--bad); color: var(--bad); padding: 0.5rem 0.75rem; }
 .muted { color: var(--muted); }
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+.skip-link {
+  background: var(--bg);
+  color: var(--fg);
+  left: 0.5rem;
+  padding: 0.5rem 1rem;
+  position: absolute;
+  top: -3rem;
+  transition: top 0.15s ease-in-out;
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+button, [type="submit"] { min-height: 44px; }
 @media (min-width: 768px) {
   body { padding: 2rem; }
 }
   </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">{{t "a11y.skip_to_content"}}</a>
+<a class="skip-link" href="#navigation">{{t "a11y.skip_to_navigation"}}</a>
 <header>
   <h1><a href="{{.Base}}/">{{.AppName}}</a></h1>
-  <nav>
+  <nav id="navigation" aria-label="{{t "a11y.navigation"}}">
   {{if .Viewer}}
     <a href="{{.Base}}/users/account">{{.Viewer.Username}}</a>
-    <a href="{{.Base}}/users/settings">Settings</a>
+    <a href="{{.Base}}/users/settings">{{t "nav.settings"}}</a>
     <a href="{{.Base}}/users/security">Security</a>
     <a href="{{.Base}}/orgs">Organizations</a>
     <form method="post" action="{{.Base}}/server/auth/logout">
       <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-      <button type="submit">Sign out</button>
+      <button type="submit">{{t "auth.logout"}}</button>
     </form>
   {{else}}
-    <a href="{{.Base}}/server/auth/login">Sign in</a>
+    <a href="{{.Base}}/server/auth/login">{{t "auth.login"}}</a>
     <a href="{{.Base}}/server/auth/register">Register</a>
   {{end}}
   </nav>
 </header>
-<main>
-{{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<main id="main-content" aria-label="{{t "a11y.main_content"}}">
+{{if .Notice}}<p class="notice" role="status" aria-live="polite">{{.Notice}}</p>{{end}}
+{{if .Error}}<p class="error" role="alert" aria-live="assertive">{{.Error}}</p>{{end}}
 {{end}}
 
 {{define "foot"}}</main>
@@ -113,16 +144,16 @@ td, th { border-bottom: 1px solid var(--line); padding: 0.35rem 0.5rem; text-ali
 {{end}}
 
 {{define "login"}}{{template "head" .}}
-<h2>Sign in</h2>
+<h2>{{t "auth.login"}}</h2>
 <form method="post" action="{{.Base}}/server/auth/login">
   <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-  <label>Username or email
+  <label>{{t "auth.username"}}
     <input type="text" name="identifier" autocomplete="username" required>
   </label>
-  <label>Password
+  <label>{{t "auth.password"}}
     <input type="password" name="password" autocomplete="current-password" required>
   </label>
-  <button type="submit">Sign in</button>
+  <button type="submit">{{t "auth.login_button"}}</button>
 </form>
 <p><a href="{{.Base}}/server/auth/password/forgot">Forgot your password?</a></p>
 {{if .Data.RegistrationOpen}}<p><a href="{{.Base}}/server/auth/register">Create an account</a></p>{{end}}

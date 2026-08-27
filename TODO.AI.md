@@ -149,6 +149,50 @@ Builder: notifications-builder
 
 ## [ ] Implement client & agent (adm_agt_/usr_agt_/org_agt_ token enrollment and data-plane sync)
 Read: AI.md PART 33
+`src/client` (redxt-cli) and `src/agent` (redxt-agent) now exist with real,
+tested infrastructure: fixed flag parsing (`flag` stdlib, `--flag value` and
+`--flag=value`), `--help`/`--version` output, `--shell completions/init/help`
+for all 8 documented shells (via the new shared `src/common/shellcomp`
+package), config file load/save (`cli.yml` / `agent.yml`, full documented
+agent.yml schema), token resolution priority (flag > env > config file >
+token file), and an HTTP client that sends the correct hardcoded
+`{project_name}-cli/agent` User-Agent regardless of binary rename. redxt-cli's
+`health` command and redxt-agent's `--status` flag are real, working commands
+against the confirmed-implemented, unauthenticated `/server/healthz` route.
+Still not implemented — tracked here rather than stubbed, per PART 1:
+- **CLI `--admin` subcommands** — blocked on PART 17's admin auth/session
+  system (`{admin_path}/config/*` surface), which is itself still an open
+  TODO.AI.md item above.
+- **Agent `status`/`test`/`register` subcommands and the one-liner enrollment
+  flow** — blocked on the server-side Agent Registration API
+  (`POST .../agents/register`) and `tokens`/`agents` CRUD, which are
+  schema-only in `src/database` with no handlers yet.
+- **Agent foreground runtime** (the actual collect/sync data-plane loop
+  IDEA.md describes — "pure DNS data plane... configured entirely from
+  server admin UI") — depends on the registration API above plus a
+  project-specific zone-sync protocol that hasn't been designed yet; running
+  `redxt-agent` with no flags currently prints a clear "not yet available"
+  message and exits 2 rather than faking a loop.
+- **`--service` / `--update` flags on both binaries** — PART 24/25 (service
+  install) and PART 23 (self-update) aren't implemented on ANY binary in this
+  codebase yet (confirmed via `grep`), so these flags are omitted from
+  `--help`/parsing rather than parsed and left non-functional.
+- **CLI cluster failover / autodiscover-driven `server.cluster` refresh**
+  (PART 33 "CLI Cluster Failover", "Agent Cluster Failover") — depends on
+  `/api/autodiscover` client-side consumption, not yet wired into either
+  binary.
+- **Full themed CLI/agent TUI** (PART 33 "CLI/TUI/GUI Theming",
+  "Responsive Layout") — redxt-cli ships only a minimal functional
+  line-menu REPL (`src/client/tui.go`) instead.
+- **`--color`/`--lang` config-file-default precedence** — both binaries'
+  `--color` flag currently defaults to the hardcoded string `"auto"`, so an
+  unset flag can't yet be overridden by `cli.yml`'s `defaults.color` /
+  `agent.yml`'s (not yet present) equivalent; needs the same "flag default
+  sentinel, then config fallback" pattern used for `--server`/`--token`.
+Test coverage (Docker, `go test ./src/client/... ./src/agent/... -cover`):
+`src/client` 94.0%, `src/agent` 94.1%, `src/common/shellcomp` 100.0%,
+`src/config` (new `ParseBool`/`IsTruthy`/`IsFalsey`) 87.6% — all above the
+60% gate. Full repo `go test ./...` passes with no regressions.
 
 ## Operational and platform PARTs (no cross-dependencies beyond the foundation)
 

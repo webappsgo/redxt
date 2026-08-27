@@ -16,6 +16,7 @@ var completionFlags = []string{
 	"--help", "--version", "--status", "--shell", "--mode", "--config",
 	"--data", "--cache", "--log", "--backup", "--pid", "--address",
 	"--port", "--baseurl", "--daemon", "--debug", "--color", "--lang",
+	"--service", "--maintenance", "--update",
 }
 
 // dirFlags take a directory argument and complete against directories.
@@ -29,6 +30,11 @@ var enumFlags = map[string][]string{
 	"--mode":  {"production", "development", "debug"},
 	"--color": {"auto", "yes", "no"},
 	"--shell": {"completions", "init", "help"},
+	// The dash-prefixed service values are spelled exactly as PART 24
+	// documents them, so completion offers the real command form.
+	"--service":     {"start", "stop", "restart", "reload", "--install", "--disable", "--uninstall", "help"},
+	"--maintenance": {"backup", "restore", "update", "mode", "setup", "help"},
+	"--update":      {"check", "yes", "branch", "help"},
 }
 
 // shells lists every shell the binary can emit integration for, in the

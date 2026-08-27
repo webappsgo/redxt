@@ -4,12 +4,11 @@
 // logging, the PID file, configuration, and the database — and the
 // matching teardown, so that main stays a thin entry point.
 //
-// The steps this package does not own are the ones whose subsystems
-// belong to later PARTs: the privilege drop and the system user (PART
-// 24), privileged port pre-binding and the HTTP server (PART 14), the
-// scheduler (PART 19), and the overlay networks (PART 32). Each is
-// wired in by its owning PART at the point the sequence reserves for
-// it.
+// Each subsystem's own package holds its logic; this package only
+// decides when it starts and when it stops. That includes the HTTP
+// server (PART 14), the scheduler (PART 19), GeoIP (PART 20), backups
+// (PART 22), the service account and privilege drop (PART 24), and the
+// Tor and I2P overlay networks (PART 32).
 package startup
 
 import (
@@ -22,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/webappsgo/redxt/src/backup"
 	"github.com/webappsgo/redxt/src/cli"
 	"github.com/webappsgo/redxt/src/common/banner"
 	"github.com/webappsgo/redxt/src/common/color"
@@ -29,9 +29,11 @@ import (
 	"github.com/webappsgo/redxt/src/config"
 	"github.com/webappsgo/redxt/src/daemon"
 	"github.com/webappsgo/redxt/src/database"
+	"github.com/webappsgo/redxt/src/geoip"
 	"github.com/webappsgo/redxt/src/logging"
 	"github.com/webappsgo/redxt/src/metrics"
 	"github.com/webappsgo/redxt/src/mode"
+	"github.com/webappsgo/redxt/src/overlay"
 	"github.com/webappsgo/redxt/src/paths"
 	"github.com/webappsgo/redxt/src/pidfile"
 	"github.com/webappsgo/redxt/src/scheduler"
@@ -109,6 +111,20 @@ type Server struct {
 	// MetricsLoki backs the PART 21 loki metrics service with a bounded
 	// window of recent log lines.
 	MetricsLoki *metrics.LokiBuffer
+	// GeoIP is the PART 20 lookup service. It is nil when GeoIP is
+	// disabled, which leaves the middleware annotation stage inert.
+	GeoIP *geoip.Service
+	// Backup is the PART 22 backup service. It is always non-nil once the
+	// databases are open, because the scheduler's daily and hourly tasks
+	// and the admin panel both drive it.
+	Backup *backup.Service
+	// Tor is the PART 32.1 hidden service, required and auto-enabled
+	// whenever a Tor binary is found. It is nil only when no Tor binary
+	// exists on the host.
+	Tor *overlay.TorManager
+	// I2P is the PART 32.2 eepsite. It is nil unless the operator opted
+	// in explicitly, which the spec never allows to happen automatically.
+	I2P *overlay.I2PManager
 	// scheduler is the PART 19 internal task runner, held so Shutdown
 	// can drain it before the databases it writes to close.
 	scheduler *scheduler.Scheduler
@@ -209,6 +225,12 @@ func handleImmediate(ctx context.Context, opts *cli.Options, name string, stream
 		return cli.RunShell(opts.Shell, opts.ShellName, name, streams.Out, streams.Err), true
 	case opts.Status:
 		return statusCommand(ctx, opts, streams), true
+	case opts.Update != "":
+		return updateCommand(ctx, opts, name, streams), true
+	case opts.Service != "":
+		return serviceCommand(opts, name, streams), true
+	case opts.Maintenance != "":
+		return maintenanceCommand(ctx, opts, name, streams), true
 	}
 	return ExitOK, false
 }
@@ -247,14 +269,17 @@ func statusCommand(ctx context.Context, opts *cli.Options, streams IO) int {
 func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) {
 	// Step 6: run context. The privilege level is locked the moment the
 	// paths package initializes, before anything can drop privileges.
-	s := &Server{
-		Mode:    mode.Resolve(opts.Mode, opts.DebugFlag()),
-		Started: time.Now(),
-	}
+	s := &Server{Started: time.Now()}
 
 	// Step 7: resolve every path once, CLI flag over environment
 	// variable over OS default.
 	s.Paths = paths.ResolveWith(overridesFrom(opts))
+
+	// The mode chain is --mode, then MODE, then the server.mode key that
+	// `--maintenance mode` persists, then production. The persisted value
+	// is read directly rather than via config.Load, because Load creates
+	// and rewrites the file and the logger does not exist yet.
+	s.Mode = mode.Resolve(resolveModeSource(opts.Mode, s.Paths), opts.DebugFlag())
 
 	// Steps 8b and 9: create the directory tree. The elevated branch
 	// additionally creates the service user and chowns the tree; that is
@@ -342,15 +367,31 @@ func Start(ctx context.Context, opts *cli.Options, streams IO) (*Server, error) 
 	// has somewhere to report to.
 	s.startMetrics()
 
+	// The PART 20 GeoIP service comes up before the listeners, because
+	// the middleware chain takes its lookup function by value. A missing
+	// database is not a startup failure: the annotation stage simply
+	// contributes nothing until the scheduler's geoip_update task has
+	// downloaded one.
+	s.startGeoIP()
+
+	// The PART 22 backup service needs both databases and nothing else,
+	// and both the scheduler's backup tasks and the admin panel drive it.
+	s.startBackup()
+
 	// Step 18: the listeners, the middleware chain, and the certificate
 	// manager (PART 14 and PART 15).
 	if err := s.startHTTP(ctx); err != nil {
 		return nil, s.unwind(err)
 	}
 
-	// Step 17 (attached after HTTP so ssl_renewal can find s.SSL): the
-	// PART 19 internal scheduler. The overlay networks (PART 32) are
-	// not yet wired in.
+	// The PART 32 overlay networks attach to the running HTTP server,
+	// because each forwards to a dedicated loopback listener that serves
+	// the same router.
+	s.startOverlays(ctx)
+
+	// Step 17 (attached after HTTP so ssl_renewal can find s.SSL, and
+	// after the overlays so tor_health and i2p_health have a running
+	// service to check): the PART 19 internal scheduler.
 	if err := s.startScheduler(ctx); err != nil {
 		return nil, s.unwind(err)
 	}
@@ -497,10 +538,16 @@ func (s *Server) Shutdown() error {
 	if err := s.stopScheduler(); err != nil {
 		errs = append(errs, err)
 	}
+	errs = append(errs, s.stopOverlays()...)
 	if err := s.stopHTTP(); err != nil {
 		errs = append(errs, err)
 	}
 	s.SSL = nil
+	s.Backup = nil
+	if s.GeoIP != nil {
+		errs = append(errs, s.GeoIP.Close())
+		s.GeoIP = nil
+	}
 
 	if s.UsersDB != nil {
 		errs = append(errs, s.UsersDB.Close())
@@ -530,6 +577,21 @@ func (s *Server) unwind(cause error) error {
 		return errors.Join(cause, err)
 	}
 	return cause
+}
+
+// resolveModeSource picks the string mode.Resolve should see. The flag
+// wins outright; an unset flag with MODE set leaves the environment to
+// mode.Resolve; only when both are absent does the persisted server.mode
+// apply, which keeps PART 6's ordering intact while giving PART 24's
+// `--maintenance mode` somewhere to take effect.
+func resolveModeSource(modeFlag string, p paths.Paths) string {
+	if modeFlag != "" {
+		return modeFlag
+	}
+	if os.Getenv("MODE") != "" {
+		return ""
+	}
+	return config.PersistedMode(p)
 }
 
 // overridesFrom maps the directory flags onto the path overrides.

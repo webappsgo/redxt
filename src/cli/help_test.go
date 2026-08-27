@@ -14,7 +14,7 @@ func TestHelpListsEveryFlag(t *testing.T) {
 			t.Fatalf("--help does not document %q", flag)
 		}
 	}
-	for _, section := range []string{"Usage:", "Information:", "Shell Integration:", "Server Configuration:"} {
+	for _, section := range []string{"Usage:", "Information:", "Shell Integration:", "Server Configuration:", "Service Management:"} {
 		if !strings.Contains(help, section) {
 			t.Fatalf("--help is missing the %q section", section)
 		}
@@ -29,6 +29,50 @@ func TestHelpUsesTheInvokedName(t *testing.T) {
 	}
 	if !strings.Contains(help, "mydns [flags]") {
 		t.Fatalf("--help usage line is missing the invoked name: %q", help)
+	}
+}
+
+// TestMaintenanceHelp checks the PART 24 maintenance block documents
+// every subcommand and resolves the real backup directory.
+func TestMaintenanceHelp(t *testing.T) {
+	out := MaintenanceHelp("redxt", "/var/backups/redxt/")
+	for _, subcommand := range []string{"backup [file]", "restore <file>", "update [cmd]", "mode <mode>", "setup"} {
+		if !strings.Contains(out, subcommand) {
+			t.Fatalf("--maintenance help does not document %q: %q", subcommand, out)
+		}
+	}
+	if !strings.Contains(out, "Default: /var/backups/redxt/redxt-{timestamp}.tar.gz") {
+		t.Fatalf("--maintenance help has the wrong default backup path: %q", out)
+	}
+	if !strings.Contains(out, "  redxt --maintenance setup\n") {
+		t.Fatalf("--maintenance help is missing the examples block: %q", out)
+	}
+}
+
+// TestUpdateHelp checks the PART 24 update block and its conditional
+// "Latest" line.
+func TestUpdateHelp(t *testing.T) {
+	tests := []struct {
+		name       string
+		current    string
+		latest     string
+		wantLatest bool
+	}{
+		{name: "no check made", current: "1.0.0", latest: "", wantLatest: false},
+		{name: "already current", current: "1.0.0", latest: "1.0.0", wantLatest: false},
+		{name: "newer release", current: "1.0.0", latest: "1.1.0", wantLatest: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := UpdateHelp("redxt", tt.current, "stable", tt.latest)
+			if !strings.Contains(out, "branch <name>") {
+				t.Fatalf("--update help does not document branch: %q", out)
+			}
+			if got := strings.Contains(out, "Latest:"); got != tt.wantLatest {
+				t.Fatalf("Latest line present = %v, want %v: %q", got, tt.wantLatest, out)
+			}
+		})
 	}
 }
 

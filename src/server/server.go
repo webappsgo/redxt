@@ -119,7 +119,16 @@ type Server struct {
 	// wg tracks the goroutines running Serve.
 	wg sync.WaitGroup
 
-	// mu guards urls, which Start fills in once the listeners are bound.
+	// handler is the fully composed router, kept so ServeExtra can put the
+	// same request pipeline behind an overlay-network listener.
+	handler http.Handler
+
+	// extra holds the servers ServeExtra started, so Shutdown can drain
+	// them alongside the clearnet listeners.
+	extra []*http.Server
+
+	// mu guards urls, which Start fills in once the listeners are bound,
+	// and extra, which ServeExtra appends to after startup.
 	mu   sync.Mutex
 	urls []string
 }
@@ -159,6 +168,7 @@ func New(o Options) (*Server, error) {
 		cfg:      o.Config,
 		log:      o.Log,
 		tls:      o.TLS,
+		handler:  handler,
 		serveErr: make(chan error, 2),
 	}
 
@@ -241,6 +251,43 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
+// ServeExtra serves the same router on a listener the caller already
+// bound. It exists for the AI.md PART 32 overlay networks: the Tor
+// hidden service and the I2P eepsite each forward to a dedicated
+// loopback listener whose wrapping (PROXY protocol, for Tor) belongs to
+// the overlay package, not here. Shutdown drains these alongside the
+// clearnet listeners.
+//
+// A failure is reported on Err like any other listener failure, using a
+// non-blocking send so an overlay listener dying after the channel is
+// already full can never strand its goroutine.
+func (s *Server) ServeExtra(ln net.Listener, label string) {
+	srv := &http.Server{
+		Handler:           s.handler,
+		ReadTimeout:       time.Duration(s.cfg.Server.Limits.ReadTimeout),
+		ReadHeaderTimeout: time.Duration(s.cfg.Server.Limits.ReadTimeout),
+		WriteTimeout:      time.Duration(s.cfg.Server.Limits.WriteTimeout),
+		IdleTimeout:       time.Duration(s.cfg.Server.Limits.IdleTimeout),
+		MaxHeaderBytes:    http.DefaultMaxHeaderBytes,
+	}
+
+	s.mu.Lock()
+	s.extra = append(s.extra, srv)
+	s.mu.Unlock()
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			select {
+			case s.serveErr <- err:
+			default:
+			}
+		}
+	}()
+	s.log.Infof("%s listener bound on %s", label, ln.Addr())
+}
+
 // Err returns the channel carrying the first non-graceful listener
 // failure. A caller selecting on it learns that a listener died without
 // having to poll.
@@ -252,6 +299,16 @@ func (s *Server) Err() <-chan error {
 // the context's deadline to finish.
 func (s *Server) Shutdown(ctx context.Context) error {
 	var errs []error
+
+	// The overlay listeners go first: a Tor or I2P client must stop being
+	// served before the clearnet side starts tearing down.
+	s.mu.Lock()
+	extra := s.extra
+	s.extra = nil
+	s.mu.Unlock()
+	for _, srv := range extra {
+		errs = append(errs, srv.Shutdown(ctx))
+	}
 
 	if s.https != nil {
 		errs = append(errs, s.https.Shutdown(ctx))

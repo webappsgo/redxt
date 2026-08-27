@@ -145,6 +145,70 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// TestParseSubcommandFlags covers the PART 8 subcommand forms, including
+// the dash-prefixed --service values and the bare-flag defaults.
+func TestParseSubcommandFlags(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		wantService     string
+		wantMaintenance string
+		wantUpdate      string
+		wantArgs        []string
+	}{
+		{name: "service start", args: []string{"--service", "start"}, wantService: "start"},
+		{name: "service install", args: []string{"--service", "--install"}, wantService: "--install"},
+		{name: "service uninstall", args: []string{"--service", "--uninstall"}, wantService: "--uninstall"},
+		{name: "service disable", args: []string{"--service", "--disable"}, wantService: "--disable"},
+		{name: "service help via dash", args: []string{"--service", "--help"}, wantService: "--help"},
+		{name: "bare service defaults to help", args: []string{"--service"}, wantService: "help"},
+		{name: "bare service before another flag", args: []string{"--service", "--debug"}, wantService: "help"},
+		{name: "inline service value", args: []string{"--service=restart"}, wantService: "restart"},
+		{name: "single dash service", args: []string{"-service", "reload"}, wantService: "reload"},
+		{name: "maintenance backup", args: []string{"--maintenance", "backup"}, wantMaintenance: "backup"},
+		{
+			name:            "maintenance restore with file",
+			args:            []string{"--maintenance", "restore", "/tmp/backup.tar.gz"},
+			wantMaintenance: "restore",
+			wantArgs:        []string{"/tmp/backup.tar.gz"},
+		},
+		{name: "bare maintenance defaults to help", args: []string{"--maintenance"}, wantMaintenance: "help"},
+		{name: "update check", args: []string{"--update", "check"}, wantUpdate: "check"},
+		{name: "bare update defaults to check", args: []string{"--update"}, wantUpdate: "check"},
+		{
+			name:       "update branch with name",
+			args:       []string{"--update", "branch", "beta"},
+			wantUpdate: "branch",
+			wantArgs:   []string{"beta"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o, err := Parse("redxt", tt.args, io.Discard)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			if o.Service != tt.wantService {
+				t.Fatalf("Service = %q, want %q", o.Service, tt.wantService)
+			}
+			if o.Maintenance != tt.wantMaintenance {
+				t.Fatalf("Maintenance = %q, want %q", o.Maintenance, tt.wantMaintenance)
+			}
+			if o.Update != tt.wantUpdate {
+				t.Fatalf("Update = %q, want %q", o.Update, tt.wantUpdate)
+			}
+			got := append(append(append([]string{}, o.ServiceArgs...), o.MaintenanceArgs...), o.UpdateArgs...)
+			if len(got) == 0 && len(tt.wantArgs) == 0 {
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantArgs) {
+				t.Fatalf("positional args = %v, want %v", got, tt.wantArgs)
+			}
+		})
+	}
+}
+
 // TestParseUnknownFlag confirms an unknown flag is an error the caller
 // handles rather than an os.Exit inside the flag package.
 func TestParseUnknownFlag(t *testing.T) {

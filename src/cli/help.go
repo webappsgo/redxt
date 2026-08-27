@@ -44,7 +44,73 @@ func Help(name string) string {
 	b.WriteString("--color {auto|yes|no}                  - Color output (default: auto)\n")
 	b.WriteString("--lang CODE                            - Language for output (default: auto)\n\n")
 
+	b.WriteString("Service Management:\n")
+	b.WriteString("--service CMD                          - Service management (run --service help for details)\n")
+	b.WriteString("--maintenance CMD                      - Maintenance operations (run --maintenance help for details)\n")
+	b.WriteString("--update [CMD]                         - Check/perform updates (run --update help for details)\n\n")
+
 	fmt.Fprintf(&b, "Run '%s <command> help' for detailed help on any command.\n", name)
+	return b.String()
+}
+
+// MaintenanceHelp renders the --maintenance help output defined verbatim
+// in AI.md PART 24 "Maintenance Help Output". backupDir is the resolved
+// backup directory, so the documented default filename is real rather
+// than a placeholder.
+func MaintenanceHelp(name, backupDir string) string {
+	var b strings.Builder
+
+	b.WriteString("Maintenance commands:\n\n")
+	b.WriteString("backup [file]                         - Create backup of all data\n")
+	fmt.Fprintf(&b, "                                        Default: %s/%s-{timestamp}.tar.gz\n", strings.TrimRight(backupDir, "/\\"), name)
+	b.WriteString("restore <file>                        - Restore from backup file\n")
+	b.WriteString("                                        Stops server, restores data, restarts server\n")
+	b.WriteString("update [cmd]                          - Manage updates\n")
+	b.WriteString("                                        check         - Check for available updates\n")
+	b.WriteString("                                        yes           - Download and install update\n")
+	b.WriteString("                                        branch <name> - Switch update branch (stable|beta|daily)\n")
+	b.WriteString("mode <mode>                           - Set application mode\n")
+	b.WriteString("                                        production    - Normal operation (default)\n")
+	b.WriteString("                                        development   - Relaxed dev defaults (does NOT enable debug; use --debug/DEBUG=true)\n")
+	b.WriteString("setup                                 - Run interactive setup wizard\n")
+	b.WriteString("                                        Creates primary Server Admin, configures server\n\n")
+	b.WriteString("Examples:\n")
+	fmt.Fprintf(&b, "  %s --maintenance backup\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance backup /path/to/backup.tar.gz\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance restore /path/to/backup.tar.gz\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance update check\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance update yes\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance mode development\n", name)
+	fmt.Fprintf(&b, "  %s --maintenance setup\n", name)
+	return b.String()
+}
+
+// UpdateHelp renders the --update help output defined verbatim in AI.md
+// PART 24 "Update Help Output". latest is printed only when it differs
+// from current, which is what the spec's "(if different)" annotation
+// asks for; an empty latest means the check has not been made.
+func UpdateHelp(name, current, branch, latest string) string {
+	var b strings.Builder
+
+	b.WriteString("Update management:\n\n")
+	b.WriteString("check                                 - Check for available updates\n")
+	b.WriteString("                                        Compares current version with latest release\n")
+	b.WriteString("yes                                   - Download and install update\n")
+	b.WriteString("                                        Downloads latest release, replaces binary, restarts\n")
+	b.WriteString("branch <name>                         - Switch update branch\n")
+	b.WriteString("                                        stable - Stable releases (default)\n")
+	b.WriteString("                                        beta   - Beta/preview releases\n")
+	b.WriteString("                                        daily  - Daily builds (development)\n\n")
+	b.WriteString("Examples:\n")
+	fmt.Fprintf(&b, "  %s --update check\n", name)
+	fmt.Fprintf(&b, "  %s --update yes\n", name)
+	fmt.Fprintf(&b, "  %s --update branch beta\n\n", name)
+	b.WriteString("Current:\n")
+	fmt.Fprintf(&b, "  Version:  %s\n", current)
+	fmt.Fprintf(&b, "  Branch:   %s\n", branch)
+	if latest != "" && latest != current {
+		fmt.Fprintf(&b, "  Latest:   %s\n", latest)
+	}
 	return b.String()
 }
 

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -41,6 +42,10 @@ type Config struct {
 
 // Server holds the server.* section of server.yml.
 type Server struct {
+	// Mode is the persisted application mode set by `--maintenance mode`
+	// per PART 24: production, development, or debug. It sits below the
+	// --mode flag and the MODE environment variable in PART 6's chain.
+	Mode string `yaml:"mode"`
 	// Listen is the bind address for the HTTP admin/API surface.
 	Listen string `yaml:"listen"`
 	// Port is the HTTP admin/API port, persisted after the first-run
@@ -82,6 +87,7 @@ type Server struct {
 	Notifications  Notifications  `yaml:"notifications"`
 	Scheduler      Scheduler      `yaml:"scheduler"`
 	GeoIP          GeoIP          `yaml:"geoip"`
+	I2P            I2P            `yaml:"i2p"`
 	Metrics        Metrics        `yaml:"metrics"`
 	Backup         Backup         `yaml:"backup"`
 	Update         Update         `yaml:"update"`
@@ -684,15 +690,32 @@ type SchedulerTask struct {
 // GeoIP holds server.geoip.* per AI.md PART 20. GeoIP is a risk
 // signal only and is never a sole access-control gate.
 type GeoIP struct {
-	// Enabled turns GeoIP lookups on. IDEA.md defaults this to false
-	// for redxt, overriding the generic spec default.
+	// Enabled turns GeoIP lookups on.
 	Enabled bool `yaml:"enabled"`
-	// Databases lists which ip-location-db categories to download
-	// (e.g. "country", "asn").
-	Databases []string `yaml:"databases"`
-	// UpdateSchedule is the cron expression the geoip_update task
-	// uses; it is also settable via server.scheduler.tasks.
-	CacheDir string `yaml:"cache_dir"`
+	// Dir is the directory the downloaded .mmdb files live in. An
+	// empty value resolves to {data_dir}/security/geoip at startup.
+	Dir string `yaml:"dir"`
+	// DenyCountries lists ISO 3166-1 alpha-2 codes to block; every
+	// other country is allowed.
+	DenyCountries []string `yaml:"deny_countries"`
+	// AllowCountries lists ISO 3166-1 alpha-2 codes to allow
+	// exclusively. It wins whenever both lists are set.
+	AllowCountries []string `yaml:"allow_countries"`
+	// Databases selects which ip-location-db categories to download.
+	Databases GeoIPDatabases `yaml:"databases"`
+}
+
+// GeoIPDatabases holds server.geoip.databases.* per AI.md PART 20.
+// All three sources are CC BY 4.0 and carry the attribution
+// requirement recorded in LICENSE.md.
+type GeoIPDatabases struct {
+	// ASN enables autonomous_system_number/organization lookups.
+	ASN bool `yaml:"asn"`
+	// Country enables country_code lookups, which country blocking
+	// requires.
+	Country bool `yaml:"country"`
+	// City enables city/subdivision/coordinate lookups.
+	City bool `yaml:"city"`
 }
 
 // Metrics holds server.metrics.* per AI.md PART 21.
@@ -759,6 +782,10 @@ type MetricsLoki struct {
 type Backup struct {
 	Encryption BackupEncryption `yaml:"encryption"`
 	Compliance BackupCompliance `yaml:"compliance"`
+	// DiskThreshold is the percentage of the backup filesystem that
+	// may be in use before a scheduled backup aborts with
+	// backup.skipped_disk_full, per PART 22. Range 1-99.
+	DiskThreshold int `yaml:"disk_threshold"`
 }
 
 // BackupEncryption holds server.backup.encryption.* per PART 22.
@@ -766,6 +793,16 @@ type BackupEncryption struct {
 	// Enabled encrypts every backup with AES-256-GCM, key derived via
 	// Argon2id from the operator-supplied password.
 	Enabled bool `yaml:"enabled"`
+	// Password is the operator-supplied backup password. It is the only
+	// source a scheduled backup has, because backup_daily and
+	// backup_hourly run unattended and cannot prompt. PART 22 offers no
+	// recovery path: losing it makes every backup taken under it
+	// permanently unreadable.
+	Password string `yaml:"password"`
+	// PasswordHint is the optional reminder PART 22 lets an operator
+	// store alongside the password. It is displayed, never used as key
+	// material, so it must not restate the password.
+	PasswordHint string `yaml:"password_hint"`
 }
 
 // BackupCompliance holds server.backup.compliance.* per PART 22.
@@ -853,6 +890,75 @@ type Tor struct {
 	// email is shown; the clearnet address is never used as a
 	// fallback.
 	ContactEmail string `yaml:"contact_email"`
+
+	// Binary overrides tor binary auto-detection with an explicit
+	// path. An empty value searches the well-known locations and
+	// then $PATH.
+	Binary string `yaml:"binary"`
+	// UseNetwork routes this server's own outbound HTTP through Tor.
+	UseNetwork bool `yaml:"use_network"`
+	// AllowUserPreference lets an individual request opt in or out of
+	// Tor for outbound work, overriding UseNetwork.
+	AllowUserPreference bool `yaml:"allow_user_preference"`
+	// MaxCircuits caps concurrent circuits, 1-128.
+	MaxCircuits int `yaml:"max_circuits"`
+	// CircuitTimeout is the per-circuit build timeout in seconds,
+	// 10-300.
+	CircuitTimeout int `yaml:"circuit_timeout"`
+	// BootstrapTimeout is how long to wait for the Tor network to
+	// bootstrap, in seconds, 30-600.
+	BootstrapTimeout int `yaml:"bootstrap_timeout"`
+	// SafeLogging keeps addresses out of tor's own log.
+	SafeLogging bool `yaml:"safe_logging"`
+	// MaxStreamsPerCircuit caps streams multiplexed onto one
+	// circuit, 10-500.
+	MaxStreamsPerCircuit int `yaml:"max_streams_per_circuit"`
+	// CloseCircuitOnStreamLimit closes a circuit once it hits
+	// MaxStreamsPerCircuit instead of queueing.
+	CloseCircuitOnStreamLimit bool `yaml:"close_circuit_on_stream_limit"`
+	// BandwidthRate is the sustained rate, "{n} KB" or "{n} MB".
+	BandwidthRate string `yaml:"bandwidth_rate"`
+	// BandwidthBurst is the burst ceiling in the same units; it must
+	// be at least BandwidthRate.
+	BandwidthBurst string `yaml:"bandwidth_burst"`
+	// MaxMonthlyBandwidth is an accounting cap, "{n} GB", "{n} TB",
+	// or "unlimited".
+	MaxMonthlyBandwidth string `yaml:"max_monthly_bandwidth"`
+	// NumIntroPoints is how many introduction points the hidden
+	// service publishes, 3-10.
+	NumIntroPoints int `yaml:"num_intro_points"`
+	// VirtualPort is the port the .onion address serves on, 1-65535.
+	VirtualPort int `yaml:"virtual_port"`
+}
+
+// I2P holds server.i2p.* per AI.md PART 32.2. The eepsite is opt-in
+// only: unlike the Tor hidden service it is never auto-enabled, and
+// nothing in this package may flip Enabled on the operator's behalf.
+type I2P struct {
+	// Enabled turns the eepsite on. Default false, always.
+	Enabled bool `yaml:"enabled"`
+	// Binary overrides i2pd binary auto-detection with an explicit
+	// path. Empty searches the well-known locations and then $PATH.
+	Binary string `yaml:"binary"`
+	// SAMAddress is the external SAM bridge used when no i2pd binary
+	// is available.
+	SAMAddress string `yaml:"sam_address"`
+	// VirtualPort is the port the .b32.i2p address serves on.
+	VirtualPort int `yaml:"virtual_port"`
+	// InboundLength is the inbound tunnel hop count, 0-7.
+	InboundLength int `yaml:"inbound_length"`
+	// OutboundLength is the outbound tunnel hop count, 0-7.
+	OutboundLength int `yaml:"outbound_length"`
+	// InboundQuantity is how many inbound tunnels to keep, 1-16.
+	InboundQuantity int `yaml:"inbound_quantity"`
+	// OutboundQuantity is how many outbound tunnels to keep, 1-16.
+	OutboundQuantity int `yaml:"outbound_quantity"`
+	// SignatureType is the destination signature algorithm; 7 is
+	// EdDSA-SHA512-Ed25519.
+	SignatureType int `yaml:"signature_type"`
+	// BootstrapTimeout is how long to wait for a destination to come
+	// up, in seconds, 30-600.
+	BootstrapTimeout int `yaml:"bootstrap_timeout"`
 }
 
 // Load reads server.yml from the resolved config path, migrating a
@@ -894,6 +1000,41 @@ func Load(p paths.Paths) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// PersistedMode reports the server.mode value stored in server.yml
+// without creating, validating, or rewriting the file. Startup needs the
+// persisted mode before the logger exists, which is earlier than Load
+// may run, and Load's side effects are unacceptable at that point. A
+// missing, unreadable, unparsable, or invalid file yields "".
+func PersistedMode(p paths.Paths) string {
+	data, err := os.ReadFile(p.ConfigFile)
+	if err != nil {
+		return ""
+	}
+	var probe struct {
+		Server struct {
+			Mode string `yaml:"mode"`
+		} `yaml:"server"`
+	}
+	if err := yaml.Unmarshal(data, &probe); err != nil {
+		return ""
+	}
+	value := strings.ToLower(strings.TrimSpace(probe.Server.Mode))
+	if !containsFold(ValidModes, value) {
+		return ""
+	}
+	return value
+}
+
+// SetMode persists server.mode, backing `--maintenance mode <mode>`.
+func SetMode(cfg *Config, value string) error {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if !containsFold(ValidModes, value) {
+		return fmt.Errorf("config: invalid mode %q: must be production or development", value)
+	}
+	cfg.Server.Mode = value
+	return cfg.Save()
 }
 
 // Warnings returns every validation message recorded during Load, in

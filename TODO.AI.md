@@ -206,12 +206,12 @@ healthcheck_self, ssl_renewal. Coverage 86.1%, `-race` clean.
 
 ## [ ] Register remaining scheduler tasks once their owning packages exist
 Read: AI.md PART 19
-`geoip_update`, `blocklist_update`, `cve_update`, `update_check`,
-`backup_daily`, `backup_hourly`, `tor_health`, `i2p_health` are already
-defined in `config.defaultSchedulerTasks()` and seeded into
-`scheduler_tasks` for admin-panel display, but have no registered
-handler in `src/startup/scheduler.go` — each is blocked on its owning
-package below (GeoIP, backup, update, Tor/I2P health) landing first.
+`geoip_update`, `update_check`, `backup_daily`, `backup_hourly`,
+`tor_health`, and `i2p_health` are now registered in
+`src/startup/scheduler.go`. Still unregistered: `blocklist_update` and
+`cve_update`, both defined in `config.defaultSchedulerTasks()` and
+seeded into `scheduler_tasks` for admin-panel display, and both blocked
+on the DNS firewall / data-zone packages that own their data sources.
 
 ## [ ] Add a driver-specific branch to the scheduler's cluster lock once non-SQLite drivers exist
 Read: AI.md PART 19, PART 10
@@ -221,12 +221,24 @@ This is correct and sufficient today because SQLite is the only
 compiled driver (see `src/database/db.go`), but PostgreSQL support
 will need `pg_try_advisory_xact_lock` (or equivalent) instead.
 
-## [ ] Implement GeoIP
+## [x] Implement GeoIP
 Read: AI.md PART 20
-`src/geoip`: MMDB download from the ip-location-db CDN, lookup, risk
-signal only (never a sole access gate), private-IP exclusion, disabled
-by default per IDEA.md. Dependency decision (maxminddb-golang vs
-hand-rolled MMDB reader) not yet made.
+`src/geoip` implemented with `maxminddb-golang` v1: ip-location-db CDN
+downloads (asn, geo-whois-asn-country, dbip-city v4/v6) with atomic
+rename, `Lookup`/`Blocked`, fail-open on every error, private-IP
+exclusion via the existing `urlvars.IsPublicIP`. Wired into
+`src/startup/geoip.go` (service lifecycle + the PART 12 middleware
+annotation seam) and registered as the `geoip_update` scheduler task.
+Both required attributions are in LICENSE.md. Coverage 73.8%.
+
+## [ ] Add the GeoIP attribution link to the first screen that displays GeoIP data
+Read: AI.md PART 20
+PART 20 requires the DB-IP and NRO attributions on a page reachable from
+every screen that displays GeoIP data. Today the annotation reaches only
+the access log (`src/server/middleware/logging.go`), so no screen
+displays it and LICENSE.md carries the notice. Blocking dependency: the
+first admin-panel or user-facing surface that renders country/ASN data —
+that change must add the attribution link at the same time.
 
 ## [x] Implement metrics
 Read: AI.md PART 21
@@ -243,29 +255,42 @@ Read: AI.md PART 21
 tested, but nothing in `src/server/handler`'s auth verifier calls them
 yet.
 
-## [ ] Implement backup & restore
+## [x] Implement backup & restore
 Read: AI.md PART 22
-`src/backup`: create/verify/restore against the existing `backups`
-table, AES-256-GCM + Argon2id encryption reusing `src/security`
-primitives, retention sweep, compliance-mode enforcement (config
-validation for this already exists in `config.validateBackup`).
+`src/backup` implemented: manifest-driven archive create/verify/restore
+against the existing `backups` table, AES-256-GCM + Argon2id encryption
+reusing `src/security` primitives, retention sweep, disk-usage checks
+(unix/windows variants), audit logging, and compliance-mode enforcement
+via the existing `config.validateBackup`. Coverage 73.0%.
 
-## [ ] Implement update command
+## [x] Implement update command
 Read: AI.md PART 23
-`src/update`: GitHub Releases API, stable/beta/daily channels, SHA-256
-checksum + signature verification, platform-specific binary
-replacement, service-aware restart.
+`src/update` implemented: GitHub Releases API with cumulative
+stable/beta/daily channels, `defer_days` eligibility, SHA-256 checksum
+verification, Unix rename-over-running-binary and Windows
+`.old` + `MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT)` replacement,
+service-aware restart (systemd/launchd/rc.d/sc) falling back to
+`syscall.Exec`. Wired into `src/startup/update.go` as the `--update
+check|yes|branch|help` dispatcher and the `update_check` scheduler task.
+Coverage 70.3%. Deliberate deviation from the spec's reference code: the
+`/releases` list endpoint is used for all three branches rather than
+`/releases/latest` for stable, because `defer_days` eligibility has to
+choose among several releases by age.
 
-## [ ] Implement privilege escalation & service integration
+## [x] Implement privilege escalation & service integration
 Read: AI.md PART 24
-`src/service`: per-OS escalation detection, dedicated system user
-creation, privilege drop after binding a privileged port.
+`src/service` implemented: per-OS escalation detection (`escalation.go`),
+dedicated system user/group creation (`sysuser.go`), privilege drop after
+binding a privileged port (`privdrop_unix.go`/`privdrop_windows.go`).
+Coverage 86.4%.
 
-## [ ] Implement service support
+## [x] Implement service support
 Read: AI.md PART 25
-Completes PART 24: systemd/OpenRC/SysVinit/runit/rc.d/launchd/Windows
-SCM install/uninstall/disable, `--service --install/--uninstall/--disable`
-CLI flags dispatched from `src/cli/flags.go`.
+Completes PART 24: systemd/OpenRC/SysVinit/runit/rc.d/launchd/Windows SCM
+unit-file templates (`templates.go`), install/uninstall/disable dispatch
+(`dispatch.go`, `install.go`, `initsystem.go`), wired into
+`src/startup/service.go` and `src/cli/flags.go` as
+`--service --install/--uninstall/--disable`.
 
 ## [x] Implement testing & development tooling
 Read: AI.md PART 29
@@ -303,15 +328,15 @@ remaining a11y subsections (focus management beyond `:focus-visible`,
 screen-reader announcements beyond the two ARIA live regions added,
 color-contrast audit, keyboard shortcuts, a11y testing requirements).
 
-## [ ] Implement overlay networks (Tor & I2P)
+## [x] Implement overlay networks (Tor & I2P)
 Read: AI.md PART 32
-Not started. `src/config`'s `Tor` struct remains the pre-existing narrow
-placeholder (`OnionAddress`, `ContactEmail` only) — no detection,
-process-supervisor, or I2P config work has been done. Blocking
-dependency: none technical: this needs its own implementation pass,
-including a real Tor-binary-detection + hidden-service supervisor (with
-`-race` coverage once goroutines are introduced) and an opt-in-only
-`features.i2p.enabled` config path, per the "never auto-enable I2P" rule.
+`src/overlay` implemented: Tor binary auto-detection + hidden-service
+process supervisor (`tor.go`, auto-enabled per PART 32.1, goroutine/mutex
+supervised, `-race` clean), I2P eepsite support via `i2pd` binary or
+external SAM bridge (`i2p.go`, strictly opt-in via `server.i2p.enabled`
+per the "never auto-enable I2P" rule), rootfs permission handling
+(`fsperm.go`). `src/config`'s `Tor`/`I2P` structs extended accordingly.
+Coverage 64.6%, race-tested.
 
 ## [ ] Reconcile PART 36 custom-domain routes with the spec tables
 Read: AI.md PART 36 (route tables, approx. lines 62775-62849)

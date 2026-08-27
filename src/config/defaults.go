@@ -18,6 +18,16 @@ const (
 	DefaultAdminPath  = "administration"
 )
 
+// DefaultMode is the persisted application mode on a fresh install.
+// PART 6 makes production the default and forbids implying debug.
+const DefaultMode = "production"
+
+// ValidModes are the values `--maintenance mode` accepts and the only
+// values server.mode may hold. Debug mode is deliberately absent: PART 6
+// makes it explicit opt-in via --mode/MODE only, and a persisted value
+// would re-enable it on every restart without an operator saying so.
+var ValidModes = []string{"production", "development"}
+
 // DefaultHSTSMaxAge is the two-year max-age AI.md PART 15 requires on
 // the Strict-Transport-Security header.
 const DefaultHSTSMaxAge = 63072000
@@ -95,7 +105,9 @@ var DefaultCompressionTypes = []string{
 // from server.yml keeps its default without needing a zero check.
 func DefaultConfig() *Config {
 	return &Config{
+		Tor: DefaultTorConfig(),
 		Server: Server{
+			Mode:               DefaultMode,
 			Listen:             "0.0.0.0",
 			Port:               0,
 			BaseURL:            "/",
@@ -348,9 +360,17 @@ func DefaultConfig() *Config {
 			},
 
 			GeoIP: GeoIP{
-				Enabled:   false,
-				Databases: append([]string(nil), DefaultGeoIPDatabases...),
+				Enabled:        true,
+				DenyCountries:  []string{},
+				AllowCountries: []string{},
+				Databases: GeoIPDatabases{
+					ASN:     true,
+					Country: true,
+					City:    true,
+				},
 			},
+
+			I2P: DefaultI2PConfig(),
 
 			Metrics: Metrics{
 				Enabled: true,
@@ -374,6 +394,7 @@ func DefaultConfig() *Config {
 				Compliance: BackupCompliance{
 					Enabled: false,
 				},
+				DiskThreshold: DefaultBackupDiskThreshold,
 			},
 
 			Update: Update{
@@ -389,9 +410,51 @@ func DefaultConfig() *Config {
 // per AI.md PART 19.
 const DefaultSchedulerTimezone = "America/New_York"
 
-// DefaultGeoIPDatabases lists the ip-location-db categories fetched
-// when GeoIP is enabled, per AI.md PART 20.
-var DefaultGeoIPDatabases = []string{"country", "asn"}
+// DefaultBackupDiskThreshold is the percentage of the backup
+// filesystem that may be in use before a scheduled backup aborts,
+// per AI.md PART 22.
+const DefaultBackupDiskThreshold = 90
+
+// DefaultTorConfig returns the AI.md PART 32.1 first-run tor block.
+// The hidden service itself has no on/off switch: it comes up
+// whenever a tor binary is present, so these values only shape how it
+// runs, never whether it does.
+func DefaultTorConfig() Tor {
+	return Tor{
+		Binary:                    "",
+		UseNetwork:                false,
+		AllowUserPreference:       true,
+		MaxCircuits:               32,
+		CircuitTimeout:            60,
+		BootstrapTimeout:          180,
+		SafeLogging:               true,
+		MaxStreamsPerCircuit:      100,
+		CloseCircuitOnStreamLimit: true,
+		BandwidthRate:             "1 MB",
+		BandwidthBurst:            "2 MB",
+		MaxMonthlyBandwidth:       "100 GB",
+		NumIntroPoints:            3,
+		VirtualPort:               80,
+	}
+}
+
+// DefaultI2PConfig returns the AI.md PART 32.2 first-run i2p block.
+// Enabled is false and stays false unless an operator sets it: the
+// eepsite is the one overlay network redxt never auto-enables.
+func DefaultI2PConfig() I2P {
+	return I2P{
+		Enabled:          false,
+		Binary:           "",
+		SAMAddress:       "127.0.0.1:7656",
+		VirtualPort:      80,
+		InboundLength:    3,
+		OutboundLength:   3,
+		InboundQuantity:  5,
+		OutboundQuantity: 5,
+		SignatureType:    7,
+		BootstrapTimeout: 300,
+	}
+}
 
 // DefaultUpdateBranch is the first-run release channel, per AI.md
 // PART 23.

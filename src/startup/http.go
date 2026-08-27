@@ -110,6 +110,7 @@ func (s *Server) middleware(users *handler.Handler) func(http.Handler) http.Hand
 		s.Log.Errorf("Rate limit store: %v", err)
 	}
 	opts.Logging.Sink = s.Log.Access
+	opts.GeoIP.Lookup = s.geoIPLookup()
 
 	if users != nil {
 		opts.Auth.Verifier = handler.NewVerifier(users.Service(), users.SessionCookieName())

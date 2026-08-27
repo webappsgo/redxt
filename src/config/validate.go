@@ -65,6 +65,8 @@ func (c *Config) Validate() bool {
 	c.validateMetrics(def)
 	c.validateBackup(def)
 	c.validateUpdate(def)
+	c.validateTor(def)
+	c.validateI2P(def)
 
 	return len(c.warnings) != before
 }
@@ -139,10 +141,58 @@ func (c *Config) validateBackupRetention(r *BackupRetention, def BackupRetention
 // disabled unless explicitly turned on, per IDEA.md's override of the
 // generic spec default.
 func (c *Config) validateGeoIP(def *Config) {
+	_ = def
 	g := &c.Server.GeoIP
-	if len(g.Databases) == 0 {
-		g.Databases = append([]string(nil), def.Server.GeoIP.Databases...)
+
+	g.DenyCountries = c.normalizeCountryList(g.DenyCountries, "geoip.deny_countries")
+	g.AllowCountries = c.normalizeCountryList(g.AllowCountries, "geoip.allow_countries")
+
+	// PART 20: allow_countries wins when both are set. The losing list
+	// is kept in the document so the operator can see what they wrote,
+	// but the warning records which one actually applies.
+	if len(g.AllowCountries) > 0 && len(g.DenyCountries) > 0 {
+		c.warnf("geoip.allow_countries and geoip.deny_countries are both set; allow_countries takes precedence")
 	}
+
+	// Country blocking cannot work without the country database, and
+	// PART 20 requires the fail-open path be a logged warning rather
+	// than a silent no-op.
+	if !g.Databases.Country && (len(g.AllowCountries) > 0 || len(g.DenyCountries) > 0) {
+		c.warnf("geoip country blocking is configured but geoip.databases.country is disabled; country blocking will be skipped")
+	}
+}
+
+// normalizeCountryList upper-cases and de-duplicates a country list,
+// dropping anything that is not an ISO 3166-1 alpha-2 code.
+func (c *Config) normalizeCountryList(list []string, name string) []string {
+	if len(list) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(list))
+	seen := map[string]bool{}
+	for _, raw := range list {
+		code := strings.ToUpper(strings.TrimSpace(raw))
+		if len(code) != 2 || !isAlphaOnly(code) {
+			c.warnf("invalid %s entry %q, expected an ISO 3166-1 alpha-2 code", name, raw)
+			continue
+		}
+		if seen[code] {
+			continue
+		}
+		seen[code] = true
+		out = append(out, code)
+	}
+	return out
+}
+
+// isAlphaOnly reports whether s is made up only of ASCII letters.
+func isAlphaOnly(s string) bool {
+	for _, r := range s {
+		if (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') {
+			return false
+		}
+	}
+	return s != ""
 }
 
 // validateMetrics checks server.metrics.* per AI.md PART 21. Tokens
@@ -170,12 +220,106 @@ func (c *Config) validateMetrics(def *Config) {
 // mode forces encryption on: an operator cannot both require
 // compliance and disable encryption.
 func (c *Config) validateBackup(def *Config) {
-	_ = def
 	b := &c.Server.Backup
 	if b.Compliance.Enabled && !b.Encryption.Enabled {
 		c.warnf("backup.compliance.enabled requires backup.encryption.enabled; enabling encryption")
 		b.Encryption.Enabled = true
 	}
+	if b.DiskThreshold < 1 || b.DiskThreshold > 99 {
+		if b.DiskThreshold != 0 {
+			c.warnf("invalid backup.disk_threshold %d, using %d", b.DiskThreshold, def.Server.Backup.DiskThreshold)
+		}
+		b.DiskThreshold = def.Server.Backup.DiskThreshold
+	}
+}
+
+// bandwidthRatePattern matches the "{n} KB"/"{n} MB" form PART 32.1
+// accepts for tor's BandwidthRate and BandwidthBurst.
+var bandwidthRatePattern = regexp.MustCompile(`^\d+\s*(KB|MB)$`)
+
+// monthlyBandwidthPattern matches the "{n} GB"/"{n} TB"/"unlimited"
+// form PART 32.1 accepts for max_monthly_bandwidth.
+var monthlyBandwidthPattern = regexp.MustCompile(`^(\d+\s*(GB|TB)|unlimited)$`)
+
+// validateTor checks tor.* per AI.md PART 32.1. Nothing here can
+// disable the hidden service: PART 32.1 gives it no toggle, so an
+// unusable value falls back to its default instead of switching Tor
+// off.
+func (c *Config) validateTor(def *Config) {
+	t := &c.Tor
+	d := def.Tor
+
+	c.clampInt(&t.MaxCircuits, d.MaxCircuits, 1, 128, "tor.max_circuits")
+	c.clampInt(&t.CircuitTimeout, d.CircuitTimeout, 10, 300, "tor.circuit_timeout")
+	c.clampInt(&t.BootstrapTimeout, d.BootstrapTimeout, 30, 600, "tor.bootstrap_timeout")
+	c.clampInt(&t.MaxStreamsPerCircuit, d.MaxStreamsPerCircuit, 10, 500, "tor.max_streams_per_circuit")
+	c.clampInt(&t.NumIntroPoints, d.NumIntroPoints, 3, 10, "tor.num_intro_points")
+	c.clampInt(&t.VirtualPort, d.VirtualPort, 1, 65535, "tor.virtual_port")
+
+	t.BandwidthRate = c.normalizeBandwidth(t.BandwidthRate, d.BandwidthRate, bandwidthRatePattern, "tor.bandwidth_rate")
+	t.BandwidthBurst = c.normalizeBandwidth(t.BandwidthBurst, d.BandwidthBurst, bandwidthRatePattern, "tor.bandwidth_burst")
+	t.MaxMonthlyBandwidth = c.normalizeBandwidth(t.MaxMonthlyBandwidth, d.MaxMonthlyBandwidth, monthlyBandwidthPattern, "tor.max_monthly_bandwidth")
+
+	// A burst below the sustained rate is not a rate limit tor can
+	// honor, so the pair is reset together rather than half-corrected.
+	rate, rateErr := ParseByteSize(t.BandwidthRate)
+	burst, burstErr := ParseByteSize(t.BandwidthBurst)
+	if rateErr == nil && burstErr == nil && burst < rate {
+		c.warnf("tor.bandwidth_burst %q is below tor.bandwidth_rate %q, using %q", t.BandwidthBurst, t.BandwidthRate, d.BandwidthBurst)
+		t.BandwidthRate = d.BandwidthRate
+		t.BandwidthBurst = d.BandwidthBurst
+	}
+}
+
+// validateI2P checks server.i2p.* per AI.md PART 32.2. Enabled is
+// never touched here in either direction: the eepsite is opt-in only
+// and validation must not become a path that turns it on.
+func (c *Config) validateI2P(def *Config) {
+	i := &c.Server.I2P
+	d := def.Server.I2P
+
+	if strings.TrimSpace(i.SAMAddress) == "" {
+		i.SAMAddress = d.SAMAddress
+	} else if _, _, err := net.SplitHostPort(i.SAMAddress); err != nil {
+		c.warnf("invalid i2p.sam_address %q, using %q", i.SAMAddress, d.SAMAddress)
+		i.SAMAddress = d.SAMAddress
+	}
+
+	c.clampInt(&i.VirtualPort, d.VirtualPort, 1, 65535, "i2p.virtual_port")
+	c.clampInt(&i.InboundLength, d.InboundLength, 0, 7, "i2p.inbound_length")
+	c.clampInt(&i.OutboundLength, d.OutboundLength, 0, 7, "i2p.outbound_length")
+	c.clampInt(&i.InboundQuantity, d.InboundQuantity, 1, 16, "i2p.inbound_quantity")
+	c.clampInt(&i.OutboundQuantity, d.OutboundQuantity, 1, 16, "i2p.outbound_quantity")
+	c.clampInt(&i.SignatureType, d.SignatureType, 0, 11, "i2p.signature_type")
+	c.clampInt(&i.BootstrapTimeout, d.BootstrapTimeout, 30, 600, "i2p.bootstrap_timeout")
+}
+
+// clampInt replaces an out-of-range value with fallback and records a
+// warning. A zero value is treated as "unset" and takes the fallback
+// silently, which is what an omitted YAML key unmarshals to.
+func (c *Config) clampInt(v *int, fallback, min, max int, name string) {
+	if *v == 0 && min > 0 {
+		*v = fallback
+		return
+	}
+	if *v < min || *v > max {
+		c.warnf("invalid %s %d, expected %d-%d, using %d", name, *v, min, max, fallback)
+		*v = fallback
+	}
+}
+
+// normalizeBandwidth trims and validates a bandwidth string against
+// pattern, falling back to fallback when it does not match.
+func (c *Config) normalizeBandwidth(value, fallback string, pattern *regexp.Regexp, name string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	if !pattern.MatchString(trimmed) {
+		c.warnf("invalid %s %q, using %q", value, name, fallback)
+		return fallback
+	}
+	return trimmed
 }
 
 // validateUpdate checks server.update.* per AI.md PART 23.
@@ -235,6 +379,14 @@ func (c *Config) validateNotifications(def *Config) {
 // identity strings.
 func (c *Config) validateServer(def *Config) {
 	s := &c.Server
+
+	if !containsFold(ValidModes, s.Mode) {
+		if strings.TrimSpace(s.Mode) != "" {
+			c.warnf("invalid server.mode %q, using %q", s.Mode, def.Server.Mode)
+		}
+		s.Mode = def.Server.Mode
+	}
+	s.Mode = strings.ToLower(strings.TrimSpace(s.Mode))
 
 	if strings.TrimSpace(s.Listen) == "" {
 		s.Listen = def.Server.Listen

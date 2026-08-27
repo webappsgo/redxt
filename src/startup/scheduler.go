@@ -13,11 +13,11 @@ import (
 // startScheduler builds and starts the AI.md PART 19 internal task
 // scheduler, registering every built-in task this build can already
 // perform end to end. A task whose subsystem does not exist yet
-// (geoip, backup, update, tor/i2p health) is intentionally left
-// unregistered rather than wired to a stub — its schedule still shows
-// up in scheduler_tasks (seeded from config.defaultSchedulerTasks) for
-// the admin panel to display, but nothing runs against it until its
-// owning package lands. See TODO.AI.md for the tracked follow-ups.
+// (blocklist_update, cve_update) is intentionally left unregistered
+// rather than wired to a stub — its schedule still shows up in
+// scheduler_tasks (seeded from config.defaultSchedulerTasks) for the
+// admin panel to display, but nothing runs against it until its owning
+// package lands. See TODO.AI.md for the tracked follow-ups.
 func (s *Server) startScheduler(ctx context.Context) error {
 	nodeID, err := database.NodeID(ctx, s.ServerDB)
 	if err != nil {
@@ -71,6 +71,68 @@ func (s *Server) startScheduler(ctx context.Context) error {
 			Run: s.selfHealthCheck,
 		}); err != nil {
 			return err
+		}
+	}
+	if s.GeoIP != nil {
+		if def, ok := tasks["geoip_update"]; ok {
+			if err := sched.Register(scheduler.Task{
+				Name: "geoip_update", Schedule: def.Schedule, Enabled: def.Enabled,
+				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+				Run: s.refreshGeoIP,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	if def, ok := tasks["update_check"]; ok {
+		if err := sched.Register(scheduler.Task{
+			Name: "update_check", Schedule: def.Schedule, Enabled: def.Enabled,
+			RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+			Run: s.checkForUpdate,
+		}); err != nil {
+			return err
+		}
+	}
+	if s.Backup != nil {
+		if def, ok := tasks["backup_daily"]; ok {
+			if err := sched.Register(scheduler.Task{
+				Name: "backup_daily", Schedule: def.Schedule, Enabled: def.Enabled,
+				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+				Run: s.runBackupDaily,
+			}); err != nil {
+				return err
+			}
+		}
+		if def, ok := tasks["backup_hourly"]; ok {
+			if err := sched.Register(scheduler.Task{
+				Name: "backup_hourly", Schedule: def.Schedule, Enabled: def.Enabled,
+				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+				Run: s.runBackupHourly,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	if s.Tor != nil {
+		if def, ok := tasks["tor_health"]; ok {
+			if err := sched.Register(scheduler.Task{
+				Name: "tor_health", Schedule: def.Schedule, Enabled: def.Enabled,
+				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+				Run: s.torHealth,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	if s.I2P != nil {
+		if def, ok := tasks["i2p_health"]; ok {
+			if err := sched.Register(scheduler.Task{
+				Name: "i2p_health", Schedule: def.Schedule, Enabled: def.Enabled,
+				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
+				Run: s.i2pHealth,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	if s.SSL != nil {

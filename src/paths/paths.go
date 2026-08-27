@@ -18,13 +18,33 @@ const (
 	internalOrg  = "webappsgo"
 	internalName = "redxt"
 	projectName  = "redxt"
+	projectOrg   = "webappsgo"
 )
+
+// ProjectOrg returns the public {project_org} that owns the repository.
+// PART 24 unit files use it to build the Documentation= URL.
+func ProjectOrg() string {
+	return projectOrg
+}
 
 // ProjectName returns the public {project_name} this build was made
 // for. It is exported so callers outside this package can name the
 // project without hardcoding the identifier, which AI.md PART 4 forbids.
 func ProjectName() string {
 	return projectName
+}
+
+// InternalOrg returns the frozen {internal_org} path-namespace
+// identifier. PART 24 unit files and service accounts need it, and
+// PART 4 forbids hardcoding it outside this package.
+func InternalOrg() string {
+	return internalOrg
+}
+
+// InternalName returns the frozen {internal_name} path-namespace
+// identifier, which is also the dedicated service user/group name.
+func InternalName() string {
+	return internalName
 }
 
 // Paths holds every resolved filesystem location the server needs.

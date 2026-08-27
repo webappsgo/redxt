@@ -27,7 +27,18 @@ SOFTWARE.
 | Library | Version | License | Copyright |
 |---------|---------|---------|-----------|
 | gopkg.in/yaml.v3 | v3.0.1 | MIT | 2006-2011 Kirill Simonov, 2011-2019 Canonical Ltd |
+| github.com/oschwald/maxminddb-golang | v1.13.1 | ISC | 2015 Gregory J. Oschwald |
 
 Full license texts available at: https://spdx.org/licenses/
 
 This list is regenerated as dependencies are added — see `go-licenses csv ./...`.
+
+## GeoIP Data Attribution
+
+The GeoIP databases downloaded by `src/geoip` (ASN, Country, City) are
+licensed CC BY 4.0 via [sapics/ip-location-db](https://github.com/sapics/ip-location-db).
+Attribution is a license condition, not an optional courtesy:
+
+<a href="https://db-ip.com/">IP Geolocation by DB-IP</a>
+
+Country and ASN data licensed CC BY 4.0 by the Number Resource Organization (NRO).

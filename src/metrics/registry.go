@@ -11,7 +11,6 @@
 package metrics
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -108,9 +107,21 @@ func labelString(labelValues map[string]string) string {
 	sort.Strings(keys)
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%q", k, labelValues[k]))
+		parts = append(parts, k+`="`+escapeLabelValue(labelValues[k])+`"`)
 	}
 	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// labelValueEscaper implements the only three escapes the Prometheus
+// text exposition parser accepts. Go's %q verb is not a substitute: it
+// also escapes non-ASCII runes as \xNN/\uNNNN, which the parser does
+// not recognize, silently corrupting UTF-8 label values such as an ASN
+// organization name.
+var labelValueEscaper = strings.NewReplacer(`\`, `\\`, "\n", `\n`, `"`, `\"`)
+
+// escapeLabelValue renders v safe to place inside a quoted label value.
+func escapeLabelValue(v string) string {
+	return labelValueEscaper.Replace(v)
 }
 
 // Counter registers name (without the registry prefix) as a counter

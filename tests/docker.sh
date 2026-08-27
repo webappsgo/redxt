@@ -8,7 +8,6 @@
 set -eo pipefail
 
 PROJECT_NAME=$(basename "$PWD")
-PROJECT_ORG=$(basename "$(dirname "$PWD")")
 
 if [ -f "Makefile" ]; then
   echo "Building with make build..."

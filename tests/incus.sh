@@ -11,11 +11,10 @@ if ! command -v incus &>/dev/null; then
 fi
 
 PROJECT_NAME=$(basename "$PWD")
-PROJECT_ORG=$(basename "$(dirname "$PWD")")
 CONTAINER_NAME="test-${PROJECT_NAME}-$$"
 INCUS_IMAGE="images:debian/trixie"
 
-trap "incus delete $CONTAINER_NAME --force 2>/dev/null || true" EXIT
+trap 'incus delete "$CONTAINER_NAME" --force 2>/dev/null || true' EXIT
 
 if [ -f "Makefile" ]; then
   echo "Building with make build..."

@@ -140,8 +140,12 @@ func (c *Config) validateBackupRetention(r *BackupRetention, def BackupRetention
 // validateGeoIP checks server.geoip.* per AI.md PART 20. GeoIP stays
 // disabled unless explicitly turned on, per IDEA.md's override of the
 // generic spec default.
-func (c *Config) validateGeoIP(def *Config) {
-	_ = def
+//
+// The defaults document is unused here: every geoip field either
+// normalizes in place or warns, so there is no field to fall back to a
+// default for. The parameter is kept to match the shape of every other
+// validate* method the dispatcher calls.
+func (c *Config) validateGeoIP(_ *Config) {
 	g := &c.Server.GeoIP
 
 	g.DenyCountries = c.normalizeCountryList(g.DenyCountries, "geoip.deny_countries")

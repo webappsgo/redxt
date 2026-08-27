@@ -25,6 +25,36 @@ Init-only variables apply only on first run and are then persisted into
 `CONFIG_DIR`, `DATA_DIR`, `LOG_DIR`, `DATABASE_DIR`, `BACKUP_DIR`,
 `PORT`, `LISTEN`, `APPLICATION_NAME`, `APPLICATION_TAGLINE`
 
+Two further path variables are read on every start and override the
+resolved path directly rather than being persisted:
+
+| Variable | Effect |
+|---|---|
+| `CACHE_DIR` | Overrides the resolved cache directory |
+| `PID_FILE` | Overrides the resolved PID file path |
+
+Runtime variables are applied on every start and are never written back
+to `server.yml`:
+
+| Variable | Effect |
+|---|---|
+| `DATABASE_DRIVER` | Database driver: `sqlite`, `libsql`, `postgres`, `mysql`, `mssql`, `mongodb` |
+| `DATABASE_URL` | Full database connection string, overriding the config file |
+| `HOSTNAME` | Fallback hostname used by URL variable resolution when the OS hostname is unavailable |
+
+SMTP delivery can be configured entirely from the environment, which
+overrides `server.notifications.email.smtp.*` in `server.yml`:
+
+| Variable | Effect |
+|---|---|
+| `SMTP_HOST` | SMTP server hostname |
+| `SMTP_PORT` | SMTP server port; a non-numeric value is ignored with a warning |
+| `SMTP_USERNAME` | SMTP authentication username |
+| `SMTP_PASSWORD` | SMTP authentication password; redacted in all logs and in debug mode |
+| `SMTP_TLS` | Enable TLS; a non-boolean value is ignored with a warning |
+| `SMTP_FROM_NAME` | Display name on outgoing mail |
+| `SMTP_FROM_EMAIL` | Envelope and header From address |
+
 Mode and debug behavior:
 
 | Variable | Effect |

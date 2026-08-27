@@ -17,6 +17,8 @@ func TestParseSchedule(t *testing.T) {
 		{"hourly", "@hourly", false},
 		{"daily", "@daily", false},
 		{"midnight", "@midnight", false},
+		{"weekly", "@weekly", false},
+		{"monthly", "@monthly", false},
 		{"cron valid", "0 3 * * *", false},
 		{"cron wrong fields", "0 3 * *", true},
 		{"cron bad minute", "60 3 * * *", true},
@@ -66,10 +68,22 @@ func TestScheduleNextCron(t *testing.T) {
 			want:  time.Date(2026, 8, 25, 1, 18, 0, 0, utc),
 		},
 		{
-			name:  "hourly",
+			name:  "hourly fires on the hour, not process start + 1h",
 			expr:  "@hourly",
 			after: time.Date(2026, 8, 25, 1, 3, 0, 0, utc),
-			want:  time.Date(2026, 8, 25, 2, 3, 0, 0, utc),
+			want:  time.Date(2026, 8, 25, 2, 0, 0, 0, utc),
+		},
+		{
+			name:  "weekly descriptor is sunday midnight",
+			expr:  "@weekly",
+			after: time.Date(2026, 8, 25, 1, 3, 0, 0, utc), // Tuesday
+			want:  time.Date(2026, 8, 30, 0, 0, 0, 0, utc), // Sunday
+		},
+		{
+			name:  "monthly descriptor is first of month midnight",
+			expr:  "@monthly",
+			after: time.Date(2026, 8, 25, 1, 3, 0, 0, utc),
+			want:  time.Date(2026, 9, 1, 0, 0, 0, 0, utc),
 		},
 	}
 	for _, tc := range tests {

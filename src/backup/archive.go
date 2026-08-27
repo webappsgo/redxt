@@ -95,9 +95,9 @@ func extractArchive(archive []byte, destDir string) (manifestJSON []byte, entrie
 		if err != nil {
 			return nil, nil, err
 		}
-		data, err := io.ReadAll(tr)
+		data, err := readEntry(tr, hdr.Name)
 		if err != nil {
-			return nil, nil, fmt.Errorf("backup: read tar content %s: %w", hdr.Name, err)
+			return nil, nil, err
 		}
 		if err := os.MkdirAll(filepath.Dir(cleaned), 0o750); err != nil {
 			return nil, nil, fmt.Errorf("backup: create extract dir: %w", err)
@@ -112,6 +112,28 @@ func extractArchive(archive []byte, destDir string) (manifestJSON []byte, entrie
 		entries = append(entries, fileEntry{Name: hdr.Name, Data: data})
 	}
 	return manifestJSON, entries, nil
+}
+
+// maxEntryBytes caps how much a single archive member may expand to on
+// extraction. A gzip stream declares no honest uncompressed size, so an
+// unbounded io.ReadAll on a crafted "tar bomb" would let a restore upload
+// exhaust the process's memory. 512 MiB is far above any real backup
+// member (the largest is the SQLite database) and far below a size that
+// could take the server down.
+const maxEntryBytes = 512 << 20
+
+// readEntry reads one tar member, refusing to buffer more than
+// maxEntryBytes. It reads one byte past the cap so an oversized member is
+// reported as an error rather than silently truncated.
+func readEntry(tr io.Reader, name string) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(tr, maxEntryBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("backup: read tar content %s: %w", name, err)
+	}
+	if len(data) > maxEntryBytes {
+		return nil, fmt.Errorf("backup: tar entry %s exceeds the %d byte extraction limit", name, maxEntryBytes)
+	}
+	return data, nil
 }
 
 // safeJoin joins base and name, rejecting any name that would escape base

@@ -97,10 +97,21 @@ func Middleware(r *Registry, durationBuckets, sizeBuckets []float64) func(http.H
 			r.Counter("http_requests_total", "Total HTTP requests.",
 				map[string]string{"method": req.Method, "path": path, "status": strconv.Itoa(statusOrDefault(cw.status))}, 1)
 			r.Histogram("http_request_duration_seconds", "HTTP request latency.", durationBuckets, labels, duration)
-			r.Histogram("http_request_size_bytes", "HTTP request body size.", sizeBuckets, labels, float64(req.ContentLength))
+			r.Histogram("http_request_size_bytes", "HTTP request body size.", sizeBuckets, labels, requestSize(req.ContentLength))
 			r.Histogram("http_response_size_bytes", "HTTP response body size.", sizeBuckets, labels, float64(cw.size))
 		})
 	}
+}
+
+// requestSize converts a net/http ContentLength into an observation.
+// Go reports -1 when the length is unknown (chunked encoding, and most
+// GETs); observing that verbatim drives the histogram _sum negative and
+// makes average-size queries wrong, so an unknown length counts as 0.
+func requestSize(contentLength int64) float64 {
+	if contentLength < 0 {
+		return 0
+	}
+	return float64(contentLength)
 }
 
 func statusOrDefault(status int) int {

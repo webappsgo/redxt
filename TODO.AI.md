@@ -378,7 +378,7 @@ Read: AI.md PART 29
 As of the PART 16/17 admin-panel pass, `go test ./... -cover` shows several
 pre-existing packages under the required 60% gate:
 `src/server/handler` 30.7%, `src/server/service` 42.9%, `src/server/store`
-40.4%, `src/daemon` 19.1%. None of these regressed this pass — `handler`
+40.4%, `src/daemon` 19.1%, `src/startup` 46.1%. None of these regressed this pass — `handler`
 gained two new tests covering the admin-login fallback added this pass
 (`web_admin_test.go`) without materially moving its percentage, since the
 package is large and mostly covers pre-existing PART 34-36 surface. Add

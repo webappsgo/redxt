@@ -18,7 +18,7 @@ func TestWriteTextAtRendersCounterGaugeHistogram(t *testing.T) {
 	for _, want := range []string{
 		"# HELP redxt_requests_total Total requests.",
 		"# TYPE redxt_requests_total counter",
-		`redxt_requests_total_total{status="200"} 3`,
+		`redxt_requests_total{status="200"} 3`,
 		"# TYPE redxt_active_requests gauge",
 		"redxt_active_requests 2",
 		"# TYPE redxt_duration_seconds histogram",

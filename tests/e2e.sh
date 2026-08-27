@@ -9,7 +9,6 @@
 set -eo pipefail
 
 PROJECT_NAME=$(basename "$PWD")
-PROJECT_ORG=$(basename "$(dirname "$PWD")")
 
 GO_CACHE="${GO_CACHE:-$HOME/go/pkg/mod}"
 GO_BUILD="${GO_BUILD:-$HOME/.cache/go-build/${PROJECT_NAME}}"

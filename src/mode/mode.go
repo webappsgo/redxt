@@ -7,8 +7,9 @@ package mode
 
 import (
 	"os"
-	"strconv"
 	"strings"
+
+	"github.com/webappsgo/redxt/src/config"
 )
 
 // Mode is one of the three application modes.
@@ -40,13 +41,18 @@ type State struct {
 func Resolve(modeFlag string, debugFlag *bool) State {
 	m := resolveMode(modeFlag)
 
+	// DEBUG counts as an explicit source only when its value actually
+	// parses through the PART 5 boolean table; a bare or unparseable
+	// DEBUG falls through to the mode default below.
+	env := debugEnv(os.Getenv("DEBUG"))
+
 	debug := false
 	switch {
 	case debugFlag != nil:
 		// --debug flag always wins, in either direction.
 		debug = *debugFlag
-	case envSet("DEBUG"):
-		debug = truthy(os.Getenv("DEBUG"))
+	case env != nil:
+		debug = *env
 	case m == Debug:
 		// MODE=debug defaults the debug flag to on.
 		debug = true
@@ -80,17 +86,16 @@ func normalize(raw string) Mode {
 	}
 }
 
-func envSet(key string) bool {
-	_, ok := os.LookupEnv(key)
-	return ok
-}
-
-func truthy(v string) bool {
-	b, err := strconv.ParseBool(strings.TrimSpace(v))
-	if err != nil {
-		return false
+// debugEnv parses the DEBUG environment variable through the project's
+// own boolean table (AI.md PART 5 forbids strconv.ParseBool for
+// user-supplied booleans, which would reject DEBUG=yes/on/enabled). It
+// returns nil when DEBUG is unset or does not name a boolean.
+func debugEnv(raw string) *bool {
+	v, ok := config.ParseBool(strings.TrimSpace(raw))
+	if !ok {
+		return nil
 	}
-	return b
+	return &v
 }
 
 // DebugEndpointsEnabled reports whether /debug/* routes (including

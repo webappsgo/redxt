@@ -22,66 +22,111 @@ func (r *Registry) writeTextAt(now time.Time) string {
 	r.snapshotUptime(now)
 	r.snapshotDB()
 
+	// Every read of a family's series/labelValues map happens under
+	// r.mu, because Counter/Gauge/Histogram insert new series keys into
+	// those same maps under the same lock. Snapshotting the pointers
+	// here rather than ranging the maps later is what keeps a scrape
+	// that overlaps a request carrying an unseen label combination from
+	// tripping Go's concurrent map read/write fatal error.
 	r.mu.Lock()
-	counterNames := sortedKeys(r.counters)
-	gaugeNames := sortedKeys(r.gauges)
-	histNames := sortedHistKeys(r.histograms)
+	counters := snapshotFamilies(r.counters)
+	gauges := snapshotFamilies(r.gauges)
+	hists := snapshotHistograms(r.histograms)
 	r.mu.Unlock()
 
 	var b strings.Builder
-	for _, name := range counterNames {
-		r.mu.Lock()
-		f := r.counters[name]
-		r.mu.Unlock()
-		r.writeFamily(&b, name, "counter", f, true)
+	for _, f := range counters {
+		r.writeFamily(&b, f, "counter")
 	}
-	for _, name := range gaugeNames {
-		r.mu.Lock()
-		f := r.gauges[name]
-		r.mu.Unlock()
-		r.writeFamily(&b, name, "gauge", f, false)
+	for _, f := range gauges {
+		r.writeFamily(&b, f, "gauge")
 	}
-	for _, name := range histNames {
-		r.mu.Lock()
-		f := r.histograms[name]
-		r.mu.Unlock()
-		r.writeHistogram(&b, name, f)
+	for _, f := range hists {
+		r.writeHistogram(&b, f)
 	}
 	return b.String()
 }
 
-func (r *Registry) writeFamily(b *strings.Builder, name, typ string, f *family, isCounter bool) {
-	metric := r.metricName(name)
+// familySnapshot is one metric family captured under r.mu: the family
+// name, its help text and its series in sorted key order. The values
+// stay as pointers so the rendering pass still reads live numbers,
+// which is safe because each value carries its own mutex.
+type familySnapshot struct {
+	name   string
+	help   string
+	labels []map[string]string
+	values []*float64Value
+}
+
+// histogramSnapshot is the histogram equivalent of familySnapshot.
+type histogramSnapshot struct {
+	name    string
+	help    string
+	buckets []float64
+	values  []*histogramValue
+}
+
+// snapshotFamilies captures every counter or gauge family. The caller
+// must hold r.mu.
+func snapshotFamilies(m map[string]*family) []familySnapshot {
+	out := make([]familySnapshot, 0, len(m))
+	for _, name := range sortedKeys(m) {
+		f := m[name]
+		snap := familySnapshot{name: name, help: f.help}
+		keys := make([]string, 0, len(f.series))
+		for k := range f.series {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			snap.labels = append(snap.labels, f.labelValues[k])
+			snap.values = append(snap.values, f.series[k])
+		}
+		out = append(out, snap)
+	}
+	return out
+}
+
+// snapshotHistograms captures every histogram family. The caller must
+// hold r.mu.
+func snapshotHistograms(m map[string]*histogramFamily) []histogramSnapshot {
+	out := make([]histogramSnapshot, 0, len(m))
+	for _, name := range sortedHistKeys(m) {
+		f := m[name]
+		snap := histogramSnapshot{name: name, help: f.help, buckets: f.buckets}
+		keys := make([]string, 0, len(f.series))
+		for k := range f.series {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			snap.values = append(snap.values, f.series[k])
+		}
+		out = append(out, snap)
+	}
+	return out
+}
+
+// writeFamily renders one counter or gauge family. The sample name is
+// the registered name verbatim: AI.md PART 21 requires counters to be
+// registered as `..._total` already, so appending a suffix here would
+// emit `..._total_total` and orphan the HELP/TYPE lines.
+func (r *Registry) writeFamily(b *strings.Builder, f familySnapshot, typ string) {
+	metric := r.metricName(f.name)
 	fmt.Fprintf(b, "# HELP %s %s\n", metric, f.help)
 	fmt.Fprintf(b, "# TYPE %s %s\n", metric, typ)
 
-	keys := make([]string, 0, len(f.series))
-	for k := range f.series {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		suffix := ""
-		if isCounter {
-			suffix = "_total"
-		}
-		lv := f.labelValues[k]
-		fmt.Fprintf(b, "%s%s%s %s\n", metric, suffix, labelString(lv), formatFloat(f.series[k].get()))
+	for i, v := range f.values {
+		fmt.Fprintf(b, "%s%s %s\n", metric, labelString(f.labels[i]), formatFloat(v.get()))
 	}
 }
 
-func (r *Registry) writeHistogram(b *strings.Builder, name string, f *histogramFamily) {
-	metric := r.metricName(name)
+func (r *Registry) writeHistogram(b *strings.Builder, f histogramSnapshot) {
+	metric := r.metricName(f.name)
 	fmt.Fprintf(b, "# HELP %s %s\n", metric, f.help)
 	fmt.Fprintf(b, "# TYPE %s histogram\n", metric)
 
-	keys := make([]string, 0, len(f.series))
-	for k := range f.series {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := f.series[k]
+	for _, v := range f.values {
 		v.mu.Lock()
 		counts := append([]uint64(nil), v.counts...)
 		sum := v.sum

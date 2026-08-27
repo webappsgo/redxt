@@ -18,10 +18,6 @@ type GeoResult struct {
 	ASN string
 	// Organization is the ASN's registered name, or "".
 	Organization string
-	// Anonymous reports whether the address is a known VPN, proxy, Tor
-	// exit or hosting-provider range. It is a risk signal for the
-	// handler to weigh, never a verdict.
-	Anonymous bool
 }
 
 // GeoIPOptions configures the PART 12 GeoIP stage.

@@ -17,7 +17,7 @@ type fieldMatcher func(v int) bool
 // minute/hour/day-of-month/month/day-of-week fields, or an "@every"
 // fixed interval.
 type schedule struct {
-	every time.Duration // non-zero for "@every"/"@hourly"/"@daily"/"@midnight"
+	every time.Duration // non-zero only for "@every"; every other descriptor is a cron expression
 
 	minute fieldMatcher
 	hour   fieldMatcher
@@ -28,7 +28,10 @@ type schedule struct {
 
 // ParseSchedule parses a schedule string in either the standard
 // 5-field cron format ("0 3 * * *") or the "@every <duration>",
-// "@hourly", "@daily"/"@midnight" shorthand AI.md PART 19 uses.
+// "@hourly", "@daily"/"@midnight", "@weekly" and "@monthly" shorthand
+// AI.md PART 19 uses. Every descriptor except "@every" resolves to a
+// cron expression so it fires on the wall-clock boundary rather than
+// drifting with process start time.
 func ParseSchedule(expr string) (*schedule, error) {
 	expr = strings.TrimSpace(expr)
 	switch {
@@ -42,9 +45,13 @@ func ParseSchedule(expr string) (*schedule, error) {
 		}
 		return &schedule{every: d}, nil
 	case expr == "@hourly":
-		return &schedule{every: time.Hour}, nil
+		return parseCron("0 * * * *")
 	case expr == "@daily", expr == "@midnight":
 		return parseCron("0 0 * * *")
+	case expr == "@weekly":
+		return parseCron("0 0 * * 0")
+	case expr == "@monthly":
+		return parseCron("0 0 1 * *")
 	default:
 		return parseCron(expr)
 	}

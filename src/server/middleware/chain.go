@@ -28,7 +28,7 @@
 //  7. Allowlist      — sets the bypass flag for 8, 9 and 10
 //  8. Blocklist
 //  9. RateLimit
-//  10. GeoIP          — annotates only, never gates
+//  10. GeoIP          — annotates; gates only when deny/allow lists are set
 //  11. Auth
 //  12. Logging
 //

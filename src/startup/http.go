@@ -111,6 +111,7 @@ func (s *Server) middleware(users *handler.Handler) func(http.Handler) http.Hand
 	}
 	opts.Logging.Sink = s.Log.Access
 	opts.GeoIP.Lookup = s.geoIPLookup()
+	opts.GeoIP.Blocked = s.geoIPBlocked()
 
 	if users != nil {
 		opts.Auth.Verifier = handler.NewVerifier(users.Service(), users.SessionCookieName())

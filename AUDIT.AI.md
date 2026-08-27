@@ -247,27 +247,36 @@ so nothing external blocks it. Not stale, but schedulable now.
 
 ### GeoIP country blocking is configured but inert — needs a decision
 
-- [ ] `geoip.Service.Blocked()` (`src/geoip/geoip.go:300`) is fully
+- [x] `geoip.Service.Blocked()` (`src/geoip/geoip.go:300`) is fully
       implemented and tested — allow-wins-over-deny, fail-open,
-      private-IP-exempt — and has **zero production callers**, so
-      `server.geoip.deny_countries` / `allow_countries` are silently no-ops.
+      private-IP-exempt — and had **zero production callers**, so
+      `server.geoip.deny_countries` / `allow_countries` were silently no-ops.
       AI.md PART 20 lines 34467-34472 give an explicit behavior table
       requiring them to block. IDEA.md:308 legitimately overrides PART 20's
       enabled-by-default posture but is silent on, and therefore does not
       override, the enforcement requirement.
 
-      **This is deliberately not fixed inline.** `src/server/middleware/geoip.go`
-      documents at length that the stage annotates and never gates, citing
-      PART 11's "GeoIP is a risk signal, never a sole access gate" — a
-      genuine spec-internal tension between PART 11 and PART 20 that
-      `Blocked()`'s fail-open, private-exempt design already half-reconciles.
-      Wiring it in is a user-visible behavior change (requests that pass
-      today would be refused), which is a stop-and-ask category. Both lists
-      default to empty, so the change is a no-op under default config and
-      only affects an operator who explicitly configured the lists and is
-      currently getting silence. RECOMMENDED FIX: add an optional
-      `Blocked func(ip string) bool` seam to `GeoIPOptions` and bind
-      `geoip.Service.Blocked` to it at startup.
+      **Fixed.** Added an optional `Blocked func(ip string) bool` seam to
+      `GeoIPOptions` (`src/server/middleware/geoip.go`) and bound
+      `geoip.Service.Blocked` to it in `src/startup/geoip.go`
+      (`geoIPBlocked()`) / `src/startup/http.go`. The GeoIP stage checks
+      `Blocked` — skipping allowlisted requests per PART 20's
+      `server.security.allowlist` bypass rule — before the lookup, and
+      refuses with 403 `apierror.CodeForbidden` on a match, mirroring the
+      existing `Blocklist` stage's short-circuit precedent. Both lists
+      default to empty, so this is a no-op under default config: an
+      operator who never sets `deny_countries`/`allow_countries` gets the
+      old annotate-only behavior unchanged. PART 11 compliance is
+      preserved — `Blocked` fails open on a missing/stale/errored database
+      or a private address (per `geoip.Service.countryBlocked()`), runs
+      after RateLimit so a blocked-country flood still spends rate-limit
+      budget, and every other stage still applies to every other request
+      regardless of country. Covered by
+      `src/server/middleware/geoip_test.go` (nil-seam passthrough,
+      annotate-only, blocked refusal, allowlist bypass) and
+      `TestGeoIPBlockedSeam` in `src/startup/geoip_test.go`. Verified in
+      Docker: `gofmt`, `go vet`, `go build`, `staticcheck`, and the full
+      `go test ./... -cover` suite all pass.
 
 ### PART 34 — Multi-User
 
@@ -408,9 +417,10 @@ so nothing external blocks it. Not stale, but schedulable now.
 ## Pass 6: Code Flow Trace
 
 Covered inline above. The dead-call-target findings are the two PART 36
-zero-call-site functions (`ResolveServableDomain`, `RenewCertificates`), the
-zero-call-site `geoip.Service.Blocked`, and the ignored-parameter case in
-`src/client/http.go`. Env-var completeness was closed by the
+zero-call-site functions (`ResolveServableDomain`, `RenewCertificates`) and
+the ignored-parameter case in `src/client/http.go`. `geoip.Service.Blocked`
+is no longer a dead-call-target — it is now wired into the GeoIP middleware
+stage (see Pass 5). Env-var completeness was closed by the
 `docs/configuration.md` fix. No wrong-call-target or swapped-argument defects
 were found.
 

@@ -48,3 +48,38 @@ func TestRefreshGeoIPWithoutAService(t *testing.T) {
 		t.Fatalf("refreshGeoIP() error = %v", err)
 	}
 }
+
+// TestGeoIPBlockedSeam covers the geoip.Service.Blocked adapter: no
+// service leaves the stage a nil (pure-annotate) seam, and a service
+// with both deny_countries/allow_countries empty and no country
+// database loaded fails open, per PART 20's "missing or disabled
+// database" rule.
+func TestGeoIPBlockedSeam(t *testing.T) {
+	if blocked := (&Server{}).geoIPBlocked(); blocked != nil {
+		t.Fatalf("geoIPBlocked() = non-nil with no GeoIP service")
+	}
+
+	s := &Server{GeoIP: geoip.New(config.GeoIP{Enabled: true}, t.TempDir(), nil)}
+	blocked := s.geoIPBlocked()
+	if blocked == nil {
+		t.Fatalf("geoIPBlocked() = nil with a GeoIP service")
+	}
+
+	tests := []struct {
+		name    string
+		address string
+	}{
+		{name: "not an address", address: "not-an-ip"},
+		{name: "empty address", address: ""},
+		{name: "public address with no database or lists", address: "8.8.8.8"},
+		{name: "private address is never blocked", address: "10.0.0.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if blocked(tt.address) {
+				t.Fatalf("blocked(%q) = true; want false (fail-open, empty lists)", tt.address)
+			}
+		})
+	}
+}

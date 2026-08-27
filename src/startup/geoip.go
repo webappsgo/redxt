@@ -68,3 +68,22 @@ func (s *Server) geoIPLookup() func(string) (middleware.GeoResult, bool) {
 		}, true
 	}
 }
+
+// geoIPBlocked adapts geoip.Service.Blocked to the PART 12 middleware
+// seam. It returns nil when GeoIP is off, which leaves the GeoIP stage
+// a pure annotator — the same as an operator who leaves
+// deny_countries/allow_countries empty, since Service.Blocked itself
+// is a no-op with both lists empty.
+func (s *Server) geoIPBlocked() func(string) bool {
+	if s.GeoIP == nil {
+		return nil
+	}
+
+	return func(address string) bool {
+		ip := net.ParseIP(address)
+		if ip == nil {
+			return false
+		}
+		return s.GeoIP.Blocked(ip)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/webappsgo/redxt/src/common/credfile"
 	"github.com/webappsgo/redxt/src/paths"
 	"gopkg.in/yaml.v3"
 )
@@ -142,10 +143,14 @@ func ConfigPath(configDir string) string {
 // LoadConfig reads agent.yml from path, returning DefaultConfig() when
 // the file does not exist yet.
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return DefaultConfig(), nil
 	}
+	if err := credfile.CheckPerms(path); err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +190,9 @@ func ResolveToken(flagToken, envToken string, cfg *Config) (string, error) {
 		return cfg.Auth.Token, nil
 	}
 	if cfg.Auth.TokenFile != "" {
+		if err := credfile.CheckPerms(cfg.Auth.TokenFile); err != nil {
+			return "", err
+		}
 		data, err := os.ReadFile(cfg.Auth.TokenFile)
 		if err != nil {
 			return "", err

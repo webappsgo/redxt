@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -118,5 +119,34 @@ func TestResolveTokenFromMissingFile(t *testing.T) {
 	cfg := &Config{Auth: AuthConfig{TokenFile: filepath.Join(dir, "missing")}}
 	if _, err := ResolveToken("", "", cfg); err == nil {
 		t.Fatal("ResolveToken() expected error for missing token file")
+	}
+}
+
+func TestLoadConfigRejectsPermissiveMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agent.yml")
+	if err := os.WriteFile(path, []byte("lang: auto\n"), 0o640); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if _, err := LoadConfig(path); err == nil {
+		t.Fatal("LoadConfig() expected error for group-readable agent.yml")
+	}
+}
+
+func TestResolveTokenFromFileRejectsPermissiveMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token")
+	if err := os.WriteFile(path, []byte("adm_agt_secret\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	cfg := &Config{Auth: AuthConfig{TokenFile: path}}
+	if _, err := ResolveToken("", "", cfg); err == nil {
+		t.Fatal("ResolveToken() expected error for world-readable token file")
 	}
 }

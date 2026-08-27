@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/webappsgo/redxt/src/common/credfile"
 	"github.com/webappsgo/redxt/src/paths"
 	"gopkg.in/yaml.v3"
 )
@@ -64,10 +65,14 @@ func ConfigPath(profile string) string {
 // LoadConfig reads cli.yml from path, returning DefaultConfig() when the
 // file does not exist yet.
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return DefaultConfig(), nil
 	}
+	if err := credfile.CheckPerms(path); err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +116,9 @@ func ResolveTokenFile(tokenFile string) (string, error) {
 	if tokenFile == "" {
 		return "", nil
 	}
+	if err := credfile.CheckPerms(tokenFile); err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return "", err
@@ -125,4 +133,29 @@ func trimNewline(s string) string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// DeleteCachedToken clears auth.token in cli.yml at path, per AI.md PART 33
+// "CLI Token Revocation Handling": on 401 TOKEN_REVOKED the cached token
+// MUST be dropped so the next invocation prompts for fresh credentials
+// instead of replaying the dead token. It is a no-op if the file does not
+// exist or already carries no token.
+func DeleteCachedToken(path string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	cfg := DefaultConfig()
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return err
+	}
+	if cfg.Auth.Token == "" {
+		return nil
+	}
+	cfg.Auth.Token = ""
+	return SaveConfig(path, cfg)
 }

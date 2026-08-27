@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -102,5 +103,33 @@ func TestResolveTokenFile(t *testing.T) {
 
 	if _, err := ResolveTokenFile(filepath.Join(dir, "missing")); err == nil {
 		t.Fatal("ResolveTokenFile() expected error for missing file")
+	}
+}
+
+func TestLoadConfigRejectsPermissiveMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cli.yml")
+	if err := os.WriteFile(path, []byte("lang: auto\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if _, err := LoadConfig(path); err == nil {
+		t.Fatal("LoadConfig() expected error for world-readable cli.yml")
+	}
+}
+
+func TestResolveTokenFileRejectsPermissiveMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token")
+	if err := os.WriteFile(path, []byte("usr_api_secret\n"), 0o666); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if _, err := ResolveTokenFile(path); err == nil {
+		t.Fatal("ResolveTokenFile() expected error for world-readable token file")
 	}
 }

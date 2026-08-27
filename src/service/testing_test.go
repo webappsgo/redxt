@@ -63,11 +63,9 @@ func (e notFoundError) Error() string { return string(e) }
 // invoking os/exec, so no test ever creates a user, writes to /etc, or
 // invokes systemctl/rc-service/launchctl/etc.
 type fakeRunner struct {
-	calls    [][]string
-	failOn   map[string]bool
-	outputs  map[string][]byte
-	runErr   error
-	runNever bool
+	calls   [][]string
+	failOn  map[string]bool
+	outputs map[string][]byte
 }
 
 func newFakeRunner() *fakeRunner {

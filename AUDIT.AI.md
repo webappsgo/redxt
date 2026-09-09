@@ -74,7 +74,7 @@ TODO.AI.md items are marked `[x]` for work that is demonstrably unbuilt.
       `cli.yml`/`token`. Neither exists; `TOKEN_REVOKED` appears nowhere
       under `src/client` or `src/agent`. — HIGH
 
-      Fixed (commit TBD), CLI side only: `apierror.CodeTokenRevoked` wired
+      Fixed (commit 36663f8f9cdd), CLI side only: `apierror.CodeTokenRevoked` wired
       through `HTTPClient.send()` in `src/client/http.go` — on 401
       TOKEN_REVOKED it clears the cached token via `DeleteCachedToken` and
       returns `ErrTokenRevoked`; `RunHealth` in `src/client/commands.go`

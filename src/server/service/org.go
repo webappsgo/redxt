@@ -578,6 +578,16 @@ func (s *Service) GrantZone(ctx context.Context, orgID, actorID, targetID, zoneI
 	if _, err := s.store.Membership(ctx, orgID, targetID); err != nil {
 		return ErrNotFound
 	}
+	// A zone named by ID must actually belong to the requesting
+	// organization, or any org could grant its members authority over a
+	// zone it does not own.
+	zoneOrgID, err := s.store.ZoneOrgID(ctx, zoneID)
+	if err != nil {
+		return mapStoreErr(err)
+	}
+	if zoneOrgID != orgID {
+		return ErrForbidden
+	}
 	if permission == "" {
 		permission = "edit"
 	}

@@ -238,6 +238,21 @@ var usersDNSTables = []string{
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_zones_org ON zones(org_id)`,
 
+	// zone_grants narrows an Editor's authority to specific zones, which is
+	// what the IDEA.md Editor role requires: create and edit records "in
+	// assigned zones" rather than across the whole organization. zone_id
+	// references zones directly (not just org_id) so a dangling or
+	// cross-org zone reference is rejected by the database itself, not
+	// only by the service layer's own check.
+	`CREATE TABLE IF NOT EXISTS zone_grants (
+		org_id     INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		zone_id    INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+		permission TEXT NOT NULL DEFAULT 'edit',
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (org_id, user_id, zone_id)
+	)`,
+
 	// health_checks holds the probes behind health-checked failover records:
 	// TCP, HTTP, or ICMP against a target, with the thresholds that flip a
 	// record between healthy and unhealthy.

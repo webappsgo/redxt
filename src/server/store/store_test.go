@@ -65,6 +65,24 @@ func makeOrg(t *testing.T, s *Store, slug string, ownerID int64) model.Org {
 	return org
 }
 
+// makeZone inserts one zone row directly (the store package has no zone
+// service yet), so tests can exercise zone-grant FK-backed behavior
+// against a zone that genuinely belongs to orgID.
+func makeZone(t *testing.T, s *Store, orgID int64, name string) int64 {
+	t.Helper()
+
+	res, err := s.DB().ExecContext(context.Background(),
+		`INSERT INTO zones (org_id, name) VALUES (?, ?)`, orgID, name)
+	if err != nil {
+		t.Fatalf("insert zone %s: %v", name, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("zone LastInsertId: %v", err)
+	}
+	return id
+}
+
 // TestAnAccountIsUniqueByNameAndAddress covers the uniqueness the schema
 // has to enforce: two accounts sharing a name or an address would make
 // the sign-in identifier ambiguous.
@@ -157,10 +175,11 @@ func TestMembershipIsScopedToOneOrganization(t *testing.T) {
 	}
 
 	// A grant made in one organization must not carry into another.
-	if err = s.GrantZone(ctx, acme.ID, member.ID, 7, "write"); err != nil {
+	zoneID := makeZone(t, s, acme.ID, "acme.example.test")
+	if err = s.GrantZone(ctx, acme.ID, member.ID, zoneID, "write"); err != nil {
 		t.Fatalf("GrantZone: %v", err)
 	}
-	granted, err := s.ZoneGranted(ctx, rival.ID, member.ID, 7)
+	granted, err := s.ZoneGranted(ctx, rival.ID, member.ID, zoneID)
 	if err != nil {
 		t.Fatalf("ZoneGranted: %v", err)
 	}

@@ -124,6 +124,17 @@ func (s *Store) RemoveMember(ctx context.Context, orgID, userID int64) error {
 	})
 }
 
+// ZoneOrgID reads the organization a zone belongs to. Callers use this to
+// confirm a zone named in a request actually belongs to the organization
+// making the request, before granting or trusting anything scoped to it.
+func (s *Store) ZoneOrgID(ctx context.Context, zoneID int64) (int64, error) {
+	var orgID int64
+	err := database.QueryRowContext(ctx, s.db, database.TimeoutSimple,
+		func(row *sql.Row) error { return row.Scan(&orgID) },
+		`SELECT org_id FROM zones WHERE id = ?`, zoneID)
+	return orgID, notFound(err)
+}
+
 // ZoneGranted reports whether a member has an explicit grant on a zone.
 // An Editor's authority is limited to granted zones, so a role check
 // alone is not enough for a record write.

@@ -46,7 +46,8 @@ func Run(args []string, io IO) int {
 		return runShell(opts, name, io)
 	}
 
-	cfg, cfgErr := LoadConfig(ConfigPath(opts.Config))
+	configPath := ConfigPath(opts.Config)
+	cfg, cfgErr := LoadConfig(configPath)
 	if cfgErr != nil {
 		fmt.Fprintf(io.Err, "load config: %s\n", cfgErr)
 		return 1
@@ -69,6 +70,7 @@ func Run(args []string, io IO) int {
 	}
 
 	client := NewHTTPClient(server, token)
+	client.ConfigPath = configPath
 
 	if len(opts.Args) == 0 {
 		return RunTUI(client, io.In, io.Out, io.Err)

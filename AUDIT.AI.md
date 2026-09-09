@@ -69,10 +69,28 @@ TODO.AI.md items are marked `[x]` for work that is demonstrably unbuilt.
       `ResolveTokenFile`, and `agent/config.go` `LoadConfig` and
       `ResolveToken`. Tests added for both packages plus `credfile_test.go`.
       Verified in Docker: gofmt/vet/build/staticcheck/full suite clean.
-- [ ] `src/client/http.go`: no `401 TOKEN_REVOKED` handling. AI.md 52856
+- [x] `src/client/http.go`: no `401 TOKEN_REVOKED` handling. AI.md 52856
       requires exit code 4 and 52859 requires deleting the cached token from
       `cli.yml`/`token`. Neither exists; `TOKEN_REVOKED` appears nowhere
       under `src/client` or `src/agent`. — HIGH
+
+      Fixed (commit TBD), CLI side only: `apierror.CodeTokenRevoked` wired
+      through `HTTPClient.send()` in `src/client/http.go` — on 401
+      TOKEN_REVOKED it clears the cached token via `DeleteCachedToken` and
+      returns `ErrTokenRevoked`; `RunHealth` in `src/client/commands.go`
+      detects it, prints the documented message, and exits with the
+      spec's own `ExitAuthError = 4` (AI.md's CLI Exit Codes table, line
+      56678, defines its own taxonomy that overrides generic sysexits).
+      Also added the same handling for 401 TOKEN_EXPIRED (`ErrTokenExpired`),
+      since AI.md 53277 explicitly requires "the same behavior" for that
+      code, which the original fix omitted. New tests in http_test.go and
+      commands_test.go cover both codes. Verified in Docker:
+      gofmt/vet/build/staticcheck/full suite clean.
+      **Agent-side handling (`src/agent`) is still unaddressed** — logged
+      as its own TODO.AI.md item since AI.md describes a different
+      "3-channel propagation" mechanism for agents that needs its own
+      read of the Agent Communication Patterns sections before
+      implementing, rather than reusing the CLI's simple pattern.
 - [ ] `src/overlay/i2p.go:199-211`: the `i2pd` child is sent `os.Interrupt`
       and immediately nil'd, with no `cmd.Wait()` anywhere in `src/overlay`.
       An i2pd that ignores SIGINT survives; one that exits becomes a zombie

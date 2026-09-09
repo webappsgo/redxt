@@ -2,11 +2,28 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/webappsgo/redxt/src/apierror"
 )
+
+// ErrTokenRevoked is returned by Get/PostJSON when the server answers a
+// request with 401 TOKEN_REVOKED, per AI.md PART 33 "CLI Token Revocation
+// Handling". Callers use errors.Is(err, ErrTokenRevoked) to detect it and
+// exit with the documented authentication-error exit code instead of a
+// generic failure.
+var ErrTokenRevoked = errors.New("api: token has been revoked")
+
+// ErrTokenExpired is returned by Get/PostJSON when the server answers a
+// request with 401 TOKEN_EXPIRED. AI.md's "CLI Token Revocation Handling"
+// section requires the same cached-token deletion on TOKEN_EXPIRED as on
+// TOKEN_REVOKED, so callers handle both errors the same way.
+var ErrTokenExpired = errors.New("api: token has expired")
 
 // HTTPClient wraps net/http with the identity and timeout rules AI.md
 // PART 33 "HTTP Client Identity" requires: the User-Agent always names
@@ -16,6 +33,11 @@ type HTTPClient struct {
 	BaseURL string
 	Token   string
 	client  *http.Client
+
+	// ConfigPath is the cli.yml path to clear a cached token from when
+	// the server reports it revoked. Left empty (as in most tests),
+	// revocation is still detected and reported but no file is touched.
+	ConfigPath string
 }
 
 // NewHTTPClient builds an HTTPClient for baseURL, trimming any trailing
@@ -79,8 +101,37 @@ func (c *HTTPClient) send(req *http.Request, out any) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp, fmt.Errorf("read response: %w", err)
+	}
+
+	// AI.md PART 33 "CLI Token Revocation Handling": on 401 TOKEN_REVOKED
+	// the cached token must be dropped and the caller told to re-auth,
+	// rather than the error envelope being silently decoded into out (or
+	// failing decode) like any other response. The section explicitly
+	// requires "the same behavior on 401 TOKEN_EXPIRED", so both codes
+	// clear the cached token the same way.
+	if resp.StatusCode == http.StatusUnauthorized {
+		var envelope apierror.Response
+		if jsonErr := json.Unmarshal(body, &envelope); jsonErr == nil {
+			switch envelope.Error {
+			case apierror.CodeTokenRevoked:
+				if c.ConfigPath != "" {
+					_ = DeleteCachedToken(c.ConfigPath)
+				}
+				return resp, ErrTokenRevoked
+			case apierror.CodeTokenExpired:
+				if c.ConfigPath != "" {
+					_ = DeleteCachedToken(c.ConfigPath)
+				}
+				return resp, ErrTokenExpired
+			}
+		}
+	}
+
 	if out != nil {
-		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		if err := json.Unmarshal(body, out); err != nil {
 			return resp, fmt.Errorf("decode response: %w", err)
 		}
 	}

@@ -470,3 +470,15 @@ Add `/users/settings/notifications` (preferences) and a user notification
 center, reusing the same store/service pattern as the admin side but
 against the separate `user_notifications` table/users.db connection —
 never merge with the admin notification tables.
+
+## [ ] PART 33: agent-side 401 TOKEN_REVOKED/TOKEN_EXPIRED handling
+AUDIT.AI.md Pass 1 finding 4 covered both `src/client` and `src/agent`.
+This session fixed only the CLI side (`src/client/http.go`,
+`src/client/commands.go`) per AI.md's "CLI Token Revocation Handling"
+section (line 53267). AI.md line 53279 notes agents use "3-channel
+propagation" rather than the CLI's simple next-request-401 pattern, but
+no dedicated "Agent Token Revocation Handling" section was found under
+PART 33's Agent Binary section — read the agent's communication-pattern
+sections (56834 "Agent Communication Patterns", 56903 decision matrix)
+to determine the actual required revocation propagation mechanism before
+implementing, and ask if the spec is genuinely silent on the specifics.

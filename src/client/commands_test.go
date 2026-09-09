@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/webappsgo/redxt/src/apierror"
 	"github.com/webappsgo/redxt/src/health"
 )
 
@@ -44,6 +45,44 @@ func TestRunHealthUnhealthy(t *testing.T) {
 	code := RunHealth(NewHTTPClient(srv.URL, ""), &out, &errOut)
 	if code != 1 {
 		t.Fatalf("RunHealth() = %d, want 1", code)
+	}
+}
+
+func TestRunHealthTokenRevokedExitsWithAuthError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(apierror.Response{OK: false, Error: apierror.CodeTokenRevoked})
+	}))
+	defer srv.Close()
+
+	var out, errOut bytes.Buffer
+	code := RunHealth(NewHTTPClient(srv.URL, "usr_api_dead"), &out, &errOut)
+	if code != ExitAuthError {
+		t.Fatalf("RunHealth() = %d, want ExitAuthError (%d)", code, ExitAuthError)
+	}
+	if !bytes.Contains(errOut.Bytes(), []byte("token has been revoked")) {
+		t.Errorf("RunHealth() stderr = %q, want a token-revoked message", errOut.String())
+	}
+}
+
+// TestRunHealthTokenExpiredExitsWithAuthError verifies AI.md's "Same
+// behavior on 401 TOKEN_EXPIRED" instruction applies through RunHealth too.
+func TestRunHealthTokenExpiredExitsWithAuthError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(apierror.Response{OK: false, Error: apierror.CodeTokenExpired})
+	}))
+	defer srv.Close()
+
+	var out, errOut bytes.Buffer
+	code := RunHealth(NewHTTPClient(srv.URL, "usr_api_stale"), &out, &errOut)
+	if code != ExitAuthError {
+		t.Fatalf("RunHealth() = %d, want ExitAuthError (%d)", code, ExitAuthError)
+	}
+	if !bytes.Contains(errOut.Bytes(), []byte("token has expired")) {
+		t.Errorf("RunHealth() stderr = %q, want a token-expired message", errOut.String())
 	}
 }
 

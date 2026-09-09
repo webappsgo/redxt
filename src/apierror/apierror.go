@@ -30,6 +30,10 @@ const (
 	CodeTokenExpired = "TOKEN_EXPIRED"
 	// CodeTokenInvalid reports a credential that failed verification.
 	CodeTokenInvalid = "TOKEN_INVALID"
+	// CodeTokenRevoked reports a credential explicitly revoked server-side
+	// (admin revocation, or logout from another session), per AI.md PART 33
+	// "CLI Token Revocation Handling".
+	CodeTokenRevoked = "TOKEN_REVOKED"
 	// CodeTwoFactorRequired reports that a second authentication factor is needed.
 	CodeTwoFactorRequired = "2FA_REQUIRED"
 	// CodeTwoFactorInvalid reports a rejected second-factor code.
@@ -76,7 +80,7 @@ func HTTPStatus(code string) int {
 	switch code {
 	case CodeBadRequest, CodeValidationFailed:
 		return http.StatusBadRequest
-	case CodeUnauthorized, CodeTokenExpired, CodeTokenInvalid, CodeTwoFactorRequired, CodeTwoFactorInvalid:
+	case CodeUnauthorized, CodeTokenExpired, CodeTokenInvalid, CodeTokenRevoked, CodeTwoFactorRequired, CodeTwoFactorInvalid:
 		return http.StatusUnauthorized
 	case CodeForbidden, CodeAccountLocked:
 		return http.StatusForbidden
@@ -110,6 +114,8 @@ func DefaultMessage(code string) string {
 		return "Token has expired"
 	case CodeTokenInvalid:
 		return "Invalid token"
+	case CodeTokenRevoked:
+		return "Token has been revoked"
 	case CodeTwoFactorRequired:
 		return "Two-factor authentication required"
 	case CodeTwoFactorInvalid:

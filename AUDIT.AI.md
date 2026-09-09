@@ -44,7 +44,7 @@ TODO.AI.md items are marked `[x]` for work that is demonstrably unbuilt.
       target's `visibility` + `org_visibility`. `src/server/store/member.go:38`
       selects `u.email` unconditionally. — HIGH
 
-      Fixed (commit TBD): `memberView` no longer has an `Email` field at
+      Fixed (commit 41a4ecd60929): `memberView` no longer has an `Email` field at
       all — AI.md's Org-Scoped User Visibility table (62616-62690) marks
       `email` as not visible in an org context or publicly, for every role,
       with no manager carve-out. Removed the `showEmail`/`PermMembersManage`

@@ -21,7 +21,7 @@ TODO.AI.md items are marked `[x]` for work that is demonstrably unbuilt.
 
 ## Pass 1: Security
 
-- [ ] `src/server/service/org.go` `GrantZone`: never validates that the
+- [x] `src/server/service/org.go` `GrantZone`: never validates that the
       granted `zoneID` belongs to the granting org, and `zone_grants.zone_id`
       carries no `REFERENCES zones(id)` FK (unlike its sibling columns in
       `src/database/schema_users.go`). `CanEditZone` reads the grant back
@@ -30,20 +30,45 @@ TODO.AI.md items are marked `[x]` for work that is demonstrably unbuilt.
       path consumes `zone_grants`), but becomes cross-tenant record write the
       moment DNS record handlers honor it. FIX: reject when
       `zone.OrgID != orgID`; add the FK. — HIGH
-- [ ] `src/server/handler/api.go:267-274` / `org.go:230-252`: `memberView`
+      Fixed (commit f91fbac4494b): `GrantZone` now loads the zone's owning
+      org via new `store.ZoneOrgID` and returns `ErrForbidden` on mismatch;
+      `zone_grants` moved to `schema_dns.go` with an explicit
+      `REFERENCES zones(id) ON DELETE CASCADE` FK; added
+      `TestGrantZoneRejectsCrossOrgZone` / `TestGrantZoneAllowsSameOrgZone`.
+      Verified in Docker: gofmt/vet/build/staticcheck/full suite clean.
+- [x] `src/server/handler/api.go:267-274` / `org.go:230-252`: `memberView`
       carries an unconditional `Email` field and `apiMembers` populates it
       for every row after only a `PermRead` check, so any org Viewer harvests
       every member's address. AI.md 62170-62232 marks `email` as NOT visible
       within an org and requires `profile_visibility` masking per the
       target's `visibility` + `org_visibility`. `src/server/store/member.go:38`
       selects `u.email` unconditionally. — HIGH
-- [ ] Client/agent credential files are read with no permission gate. AI.md
+
+      Fixed (commit TBD): `memberView` no longer has an `Email` field at
+      all — AI.md's Org-Scoped User Visibility table (62616-62690) marks
+      `email` as not visible in an org context or publicly, for every role,
+      with no manager carve-out. Removed the `showEmail`/`PermMembersManage`
+      conditional in `org.go`'s `apiMembers` and the equivalent
+      `CanManageMembers` conditional in `web.go`'s `orgPageData`; corrected
+      the `memberView` doc comment, which had falsely claimed a
+      permission-based carve-out with no basis in AI.md/IDEA.md.
+      `store/member.go:38` still scans `u.email` into the internal `Member`
+      struct for legitimate internal use, but it is never read outside that
+      package now that no handler serializes it. `handler_test.go` updated
+      so the owner-caller assertion expects email to be empty too. Verified
+      in Docker: gofmt/vet/build/staticcheck/full suite clean.
+- [x] Client/agent credential files are read with no permission gate. AI.md
       52838/52847 require `os.Stat` and refusal when
       `info.Mode().Perm()&0o077 != 0`. `src/client/config.go` `LoadConfig`
       and `ResolveTokenFile`, and `src/agent/config.go:137+`, all read
       without the check (`SaveConfig` does write 0600, so only the read-side
       refusal is missing). FIX: shared `checkCredentialPerms(path)` helper
       called from every credential read, non-Windows. — HIGH
+      Fixed (commit 7ec4d793410a): shared `src/common/credfile.CheckPerms`
+      (non-Windows no-op), called from `client/config.go` `LoadConfig` and
+      `ResolveTokenFile`, and `agent/config.go` `LoadConfig` and
+      `ResolveToken`. Tests added for both packages plus `credfile_test.go`.
+      Verified in Docker: gofmt/vet/build/staticcheck/full suite clean.
 - [ ] `src/client/http.go`: no `401 TOKEN_REVOKED` handling. AI.md 52856
       requires exit code 4 and 52859 requires deleting the cached token from
       `cli.yml`/`token`. Neither exists; `TOKEN_REVOKED` appears nowhere

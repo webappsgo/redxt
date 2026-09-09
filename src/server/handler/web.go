@@ -936,7 +936,6 @@ func (h *Handler) orgPageData(r *http.Request, c caller, access service.OrgAcces
 		data.Members = append(data.Members, memberView{
 			UserID:   m.UserID,
 			Username: m.Username,
-			Email:    m.Email,
 			Role:     m.Role,
 			JoinedAt: m.CreatedAt,
 		})

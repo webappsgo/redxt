@@ -243,7 +243,6 @@ func (h *Handler) apiMembers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, memberView{
 			UserID:   m.UserID,
 			Username: m.Username,
-			Email:    m.Email,
 			Role:     m.Role,
 			JoinedAt: m.CreatedAt,
 		})

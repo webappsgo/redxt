@@ -326,6 +326,99 @@ func TestWrongPasswordAndUnknownAccountAnswerIdentically(t *testing.T) {
 	}
 }
 
+// TestMemberListHidesEmailFromViewer covers the AUDIT.AI.md Pass 1 finding
+// that apiMembers sent every member's email to any org Viewer. AI.md
+// 62182-62196 marks email as not visible within an org; this project's own
+// carve-out is user.PermMembersManage (owner/admin), so a Viewer must never
+// see it while an Admin still can.
+func TestMemberListHidesEmailFromViewer(t *testing.T) {
+	ts := newTestServer(t)
+	owner := ts.account(t, "ada")
+	viewer := ts.account(t, "grace")
+
+	created := ts.do(t, http.MethodPost, ts.base+"/orgs", url.Values{
+		"slug": {"acme"},
+		"name": {"Acme"},
+	}, owner)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create org: status = %d (%s)", created.Code, created.Body.String())
+	}
+
+	invited := ts.do(t, http.MethodPost, ts.base+"/orgs/acme/invites", url.Values{
+		"role": {"viewer"},
+	}, owner)
+	if invited.Code != http.StatusOK {
+		t.Fatalf("create invite: status = %d (%s)", invited.Code, invited.Body.String())
+	}
+	var inviteResp struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(invited.Body.Bytes(), &inviteResp); err != nil {
+		t.Fatalf("decode invite response: %v (%s)", err, invited.Body.String())
+	}
+	if inviteResp.Data.Code == "" {
+		t.Fatalf("invite response carried no code: %s", invited.Body.String())
+	}
+
+	accepted := ts.do(t, http.MethodPost, ts.base+"/users/invites/"+inviteResp.Data.Code, nil, viewer)
+	if accepted.Code != http.StatusOK {
+		t.Fatalf("accept invite: status = %d (%s)", accepted.Code, accepted.Body.String())
+	}
+
+	type member struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Role     string `json:"role"`
+	}
+	decode := func(rec *httptest.ResponseRecorder) []member {
+		t.Helper()
+		var resp struct {
+			Data []member `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode member list: %v (%s)", err, rec.Body.String())
+		}
+		return resp.Data
+	}
+
+	asViewer := ts.do(t, http.MethodGet, ts.base+"/orgs/acme/members", nil, viewer)
+	if asViewer.Code != http.StatusOK {
+		t.Fatalf("member list as viewer: status = %d (%s)", asViewer.Code, asViewer.Body.String())
+	}
+	if strings.Contains(asViewer.Body.String(), "@example.test") {
+		t.Errorf("viewer received plaintext email addresses: %s", asViewer.Body.String())
+	}
+	for _, m := range decode(asViewer) {
+		if m.Email != "" {
+			t.Errorf("member %q: email = %q, want empty for a viewer caller", m.Username, m.Email)
+		}
+	}
+
+	asOwner := ts.do(t, http.MethodGet, ts.base+"/orgs/acme/members", nil, owner)
+	if asOwner.Code != http.StatusOK {
+		t.Fatalf("member list as owner: status = %d (%s)", asOwner.Code, asOwner.Body.String())
+	}
+	// AI.md's org-scoped visibility table marks email as never visible in an
+	// org context, for any role — the owner gets no carve-out either.
+	if strings.Contains(asOwner.Body.String(), "@example.test") {
+		t.Errorf("owner received plaintext email addresses: %s", asOwner.Body.String())
+	}
+	found := false
+	for _, m := range decode(asOwner) {
+		if m.Email != "" {
+			t.Errorf("member %q: email = %q, want empty even for an owner caller", m.Username, m.Email)
+		}
+		if m.Username == "grace" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("owner's member list did not include grace: %s", asOwner.Body.String())
+	}
+}
+
 // errorMessage pulls the rendered failure reason out of a page.
 func errorMessage(t *testing.T, body string) string {
 	t.Helper()

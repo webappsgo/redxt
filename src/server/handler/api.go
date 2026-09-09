@@ -265,10 +265,16 @@ func orgViews(list []model.Org) []orgView {
 }
 
 // memberView is the JSON shape of an organization membership.
+//
+// AI.md's "What Basic Info Means" table (PART 35, Org-Scoped User
+// Visibility) marks email as not visible in an org context or publicly,
+// for every role without exception — there is no manager carve-out.
+// Email is never populated here; org member management that genuinely
+// needs an address (e.g. re-sending an invite) uses the invite record's
+// own email, not this view.
 type memberView struct {
 	UserID   int64     `json:"user_id"`
 	Username string    `json:"username"`
-	Email    string    `json:"email"`
 	Role     string    `json:"role"`
 	JoinedAt time.Time `json:"joined_at"`
 }

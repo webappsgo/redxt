@@ -27,6 +27,7 @@ SOFTWARE.
 | Library | Version | License | Copyright |
 |---------|---------|---------|-----------|
 | gopkg.in/yaml.v3 | v3.0.1 | MIT | 2006-2011 Kirill Simonov, 2011-2019 Canonical Ltd |
+| github.com/miekg/dns | v1.1.73 | BSD-3-Clause | 2009 The Go Authors; 2011 Miek Gieben |
 | github.com/oschwald/maxminddb-golang | v1.13.1 | ISC | 2015 Gregory J. Oschwald |
 | golang.org/x/text | v0.44.0 | BSD-3-Clause | 2009 The Go Authors |
 

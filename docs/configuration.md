@@ -38,6 +38,7 @@ to `server.yml`:
 
 | Variable | Effect |
 |---|---|
+| `DNS_PORT` | DNS UDP/TCP listener port; overrides `dns.port` at runtime |
 | `DATABASE_DRIVER` | Database driver: `sqlite`, `libsql`, `postgres`, `mysql`, `mssql`, `mongodb` |
 | `DATABASE_URL` | Full database connection string, overriding the config file |
 | `HOSTNAME` | Fallback hostname used by URL variable resolution when the OS hostname is unavailable |
@@ -54,6 +55,13 @@ overrides `server.notifications.email.smtp.*` in `server.yml`:
 | `SMTP_TLS` | Enable TLS; a non-boolean value is ignored with a warning |
 | `SMTP_FROM_NAME` | Display name on outgoing mail |
 | `SMTP_FROM_EMAIL` | Envelope and header From address |
+
+The built-in DNS listener uses UDP and TCP on port 53 by default. It follows
+`server.listen` unless `dns.address` names a dedicated interface. Set
+`dns.enabled: false` to disable it or `dns.port` to override the standard
+port. `DNS_PORT` overrides `dns.port` at runtime and is never persisted.
+The current listener serves verified primary and secondary zones; recursive
+resolution and encrypted DNS transports are not available yet.
 
 Mode and debug behavior:
 

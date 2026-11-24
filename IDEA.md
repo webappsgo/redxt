@@ -230,6 +230,7 @@ Each zone and listener can use its own role and policy settings.
 ### Transports & modern DNS
 
 - **Listeners**: Do53 UDP/TCP, DoT (RFC 7858), DoH on HTTP/2 + HTTP/3 (RFC 8484), DoQ (RFC 9250), **DNSCrypt**. Encrypted listeners on by default with automatic certificates.
+- **Bind addresses**: DNS listeners default to the server's configured listen address; an operator may configure a dedicated DNS address for a separate data-plane interface. DoH shares the existing HTTP(S) listener. DNS remains on its standard protocol ports.
 - **Discovery**: DDR (RFC 9462) and SVCB/HTTPS (RFC 9460/9461) published automatically; DNR-ready (RFC 9463) for the DHCP companion.
 - **Upstream**: forwarders and transfers over TLS (XoT, RFC 9103); upstream transports include Do53, DoT, DoH, DoQ, DNSCrypt; egress optionally via SOCKS5/HTTP proxy or Tor.
 - **ECS (RFC 7871)**: inbound honored for geo-aware authoritative answers (only when GeoIP enabled); **outbound to forwarders off by default** (scope-0/stripped), admin-enableable with prefix anonymization (/24 v4, /56 v6).

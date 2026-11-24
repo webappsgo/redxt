@@ -73,4 +73,6 @@ none is configured, and persists the chosen port to `server.yml`.
 ## Admin Panel
 
 The admin panel path is configurable (default `administration`) and is
-served under `/server/{admin_path}`. See [Admin Panel](admin.md).
+served under `/server/{admin_path}`. The `preferences` segment is reserved
+for guest preferences and falls back to the default admin path. See
+[Admin Panel](admin.md).

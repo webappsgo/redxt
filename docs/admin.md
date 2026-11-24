@@ -14,20 +14,17 @@ Sign-in for admins and regular users happens through the server-rendered
 login form at `/server/auth/login` (`GET` renders the form, `POST`
 authenticates and starts a session).
 
-## Features
+## Available pages
 
-- Full settings surface — every configurable value in `server.yml` is
-  editable from the admin panel, with no feature gated behind a paywall
-- Server-side rendered Go templates only — no client-side framework;
-  every admin feature works with JavaScript disabled
-- Mobile-first responsive layout (tablet 768px, desktop 1024px
-  breakpoints) with light/dark/auto theme
-- Separate account tables for **Server Admins** (manage the app) and
-  **Regular Users** (end-users) — the two are never merged
+The current admin panel provides the first-run setup wizard, dashboard,
+application name and tagline settings, server information, theme choice,
+and logout. Pages require an authenticated Server Admin session; a
+Regular User is redirected to their own account area.
 
-## Admin API
+Guest appearance and language preferences are separate from the admin
+panel and live at `/server/preferences`. This path is reserved and cannot
+be configured as the admin path.
 
-Administrative actions are also reachable through the versioned REST
-API (`/api/v1/...`), sharing the same authentication/session model as
-the HTML admin panel and the same unified response shape described in
-[API Reference](api.md).
+The wider settings, audit, security, backup, update, cluster, and agent
+management surfaces are not currently exposed by the admin panel. The
+browser UI is server-rendered and its forms work without JavaScript.

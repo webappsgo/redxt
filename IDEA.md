@@ -9,8 +9,6 @@ All DNS roles are available without requiring an external DNS service.
 
 **Reference deployment**: the official site and flagship public instance run at **redxt.us** (serving `redxt.us` and `*.redxt.us`); **ns1.redxt.us** and **ns2.redxt.us** are cluster nodes. The public DDNS provider, redirect engine, and data zones (including cvedex) operate under this domain.
 
-**Origin note**: this project was formed by merging the `casns` project's goals/features/spec into `redxt` (this project keeps `redxt`'s name, org, and `official_site`; `casns`'s business logic became this spec). No code was carried over — redxt is implemented from scratch under this AI.md. The `casns` directory and its GitHub repository are retired once this merge is verified.
-
 ## Project variables
 
 project_name:    redxt
@@ -55,11 +53,11 @@ BIND-style Response Rate Limiting (RRL) and per-client/per-zone throttles are al
 - **Not an mDNS/LLMNR reflector** — local discovery is out of scope.
 - **Not an NTP server, registrar, CDN, reverse proxy, mail server, or packet firewall** — redxt hosts the records (MX, SPF, DKIM, DMARC, TLSA, CAA) and filters DNS answers, nothing else. HTTP serving is limited to the public service hosts listed below.
 - **Not a downstream DNS load balancer (dnsdist)** — balancing across upstreams is the forwarder policy engine; balancing across redxt instances is clustering/agents; fronting third-party DNS pools is explicitly rejected. The supported pattern for legacy servers is migration (AXFR them in, retire them).
-- **No plugin/app runtime** — extensibility is built in: data zones, RPZ, REST API, webhooks, multi-channel notifications.
+- **No plugins or installable apps** — extensions are provided through data zones, RPZ, REST APIs, webhooks, and notifications.
 - **No org change-approval workflow** — versioning, audit trail, and role separation cover shared-org safety.
 - **No AI/ML** — rule-based logic only (including the tunneling-detection rules).
 - **No outbound telemetry, no cloud dependency, no monetization, no feature tiers** — every feature for every deployment size.
-- **Not a byte-for-byte redirect.center/txtdirect clone** — redxt's redirect engine (see "Server roles") is a from-scratch, RFC-compliant design that natively supports both projects' DNS record schemes (CNAME-encoded and TXT-directive, researched from their public source); txtdirect's `proxy` record type (real reverse-proxying) is excluded per the reverse-proxy non-goal above.
+- **Not a byte-for-byte redirect.center/txtdirect clone** — redxt supports both projects' CNAME-encoded and TXT-directive DNS record schemes; txtdirect's `proxy` type is excluded because reverse-proxying is outside the product scope.
 
 ### Roles & permissions
 
@@ -106,7 +104,7 @@ All external dependencies are optional, fail safe, and have stated trust assumpt
 | Upstream forwarders (built-in catalog + custom) | Untrusted for integrity unless DNSSEC-validated; trusted only to answer | Health probes demote; rollover to the user's secondary; serve-stale; if both down, fall back to full recursion |
 | Root/authoritative internet DNS (recursion) | Untrusted; DNSSEC validation enforces integrity | SERVFAIL with RFC 8914 extended error on validation failure |
 | Blocklist/RPZ feed URLs | **Untrusted input**: defensive parsing, size caps, checksums where offered; a feed can only block/rewrite within its declared policy scope, never add authoritative data | Keep last good list + notify; skip and report malformed entries |
-| Data-zone sources (CI-processed GitHub Releases, e.g. cvedex) | Trusted only when release signature/checksum verifies | Keep last good dataset; alert |
+| Data-zone sources (signed release feeds, e.g. cvedex) | Trusted only when release signature/checksum verifies | Keep last good dataset; alert |
 | Tor daemon / network | Transport for `.onion`/`.exit` only (RFC 7686); DNSSEC validation auto-excepted for these zones | Tor down → NXDOMAIN/SERVFAIL for onion only |
 | Outbound proxy (SOCKS5/HTTP; Tor is a special case) | Transport only; admin-configured | Proxy down → per-policy: fail closed (privacy) or fall back direct (availability), admin's choice |
 | ACME CA | Cert issuance only | Renewal failure → notify + self-signed fallback; never blocks DNS |
@@ -116,7 +114,7 @@ All external dependencies are optional, fail safe, and have stated trust assumpt
 | Webhooks/notification channels | Receive-only sinks | Retry with backoff, then log |
 | Future casapps DHCP server | Authenticated peer via RFC 2136+TSIG and/or lease-event API with scoped token; leases become A/AAAA/PTR with expiry cleanup | DHCP down → records age out per policy |
 | AD/Kerberos infrastructure (GSS-TSIG) | Trusted only for the identities it asserts on update messages | KDC unreachable → GSS-TSIG updates fail closed; everything else unaffected |
-| GeoIP database (optional, local file) | Informational | Missing → geo features disabled |
+| GeoIP data (optional) | Informational | Missing → geo features disabled |
 | Peer cluster nodes / agents | Authenticated members with scoped data access | Membership or quorum failures stop management writes; query serving continues where local data is available |
 | Terraform provider | A privileged API client; trusts redxt's API, authenticated by scoped org tokens | API errors surface as Terraform failures; no special server-side trust |
 
@@ -165,7 +163,7 @@ Inbound DNS queries, DNS UPDATE messages, provider-API calls, encrypted-transpor
 11. **Cluster writes require quorum** per spec — management-plane availability is sacrificed in minority partitions; query serving continues.
 12. **Query path is stateless per node** — no node-pinned query state, so cluster nodes and agents are anycast-safe by design.
 13. **DNSSEC is required, not optional** — every domain a user/org adds is signed by default (RFC 4033–4035); this is a stronger stance than "supported," reflecting that an RFC-noncompliant DNS response or an unauthenticated dynamic update is treated as a security bug, not a missing feature.
-14. **BIND configuration and zone files are interoperability surfaces** — operators may import, export, and keep them synchronized with the server's managed state; conflicting edits from both surfaces are surfaced for review rather than silently overwritten. The project's primary server configuration follows AI.md.
+14. **BIND configuration and zone files are interoperability formats** — operators may import, export, and synchronize them with managed DNS settings and zone data; conflicting changes are surfaced for review.
 
 ---
 
@@ -177,14 +175,11 @@ Each zone and listener can use its own role and policy settings.
 - **Recursive resolver** — full iterative resolution from root hints with DNSSEC validation, QNAME minimization, aggressive negative caching (RFC 8198), serve-stale (RFC 8767), **cache prefetch** of popular expiring entries, **DNS64** (RFC 6147), and **hyperlocal root** (RFC 8806) serving the root zone locally.
 - **Forwarder** — see "Forwarders & upstream policy".
 - **Hybrid / split-horizon with views** — per-client-ACL zone sets and per-zone view answers; local zones authoritative, the rest recursed or forwarded.
-- **Redirect engine** — replaces both redirect.center and txtdirect by supporting each project's DNS record scheme natively, researched from their public source (`github.com/udleinati/redirect.center`, `github.com/txtdirect/txtdirect`), served by the built-in HTTP listener:
-  - **CNAME-encoded mode (redirect.center-compatible)**: the destination is DNS-only — the client CNAMEs a hostname to `<encoded-labels>.<redxt redirect domain>`. redxt resolves that CNAME target's own label chain to recover the destination: plain labels concatenate into the destination host; reserved option labels (`_https`/`opts-https`, `_path-<base32>`/`opts-path-<base32>`, `_query-<base32>`/`opts-query-<base32>`, `_statuscode-301|302|307|308`, `_port-<n>`, `_uri`/`opts-uri` to pass through the original request path+query, `_slash`/`opts-slash`) are stripped and decoded (base32 for arbitrary path/query bytes) to build protocol, path, query, port, and status code. No TXT record involved.
-  - **TXT-directive mode (txtdirect-compatible)**: a semicolon-separated `key=value` TXT record at the apex or a `_`-prefixed wildcard subzone (txtdirect's `_redirect` basezone convention), e.g. `v=txtv0; to=https://example.com; code=302`. Recognized keys: `v=` (version tag, required), `to=` (target URL, placeholder-expanded), `code=` (HTTP status, default 302), `type=` (`host` default; `path` for regex/path-segment routing via `re=`/`from=`; `gometa` to serve a `<meta name="go-import">` vanity-import-path response for `go get`; `dockerv2` to answer Docker Registry v2 API requests with a redirect to the real registry — both `gometa` and `dockerv2` are lookup-and-answer, not proxying, so they reuse the same record-resolution path as `host`/`path`), `ref=` (inject `Referer` header), `root=`, `vcs=` (VCS hint for `gometa`), `website=`, `use=` (chain to an upstream `_redirect.` zone for shared/reusable rule sets), and `>Header=value` for custom response headers. 255-byte TXT value cap enforced per spec.
-  - **Excluded**: txtdirect's `proxy` type (real reverse-proxying — persistent upstream connections, bandwidth passthrough, SSRF-style upstream trust) is a categorically different feature from DNS-driven redirects/answers and is left to dedicated reverse-proxy tools (Caddy, nginx, Traefik); revisit only if a concrete need arises.
+- **Redirect engine** — supports redirect.center-compatible CNAME-encoded targets and txtdirect-compatible TXT directives. CNAME targets can specify a destination, protocol, path, query, and status code. TXT directives can specify a destination, status code, path behavior, Go import metadata, Docker registry redirects, custom headers, and reusable shared rules. Both modes support parking pages and DNS answer rewrites; reverse-proxying is out of scope.
   - **Shared behavior across modes**: self-redirect loop detection, a configurable path/host blocklist (redirect.center's "guardian" pattern generalized into the existing filtering/policy engine and per-org reserved-name rules), fallback-on-parse-error to a configured default rather than a hard error, and DNS-level answer rewrites (NXDOMAIN rewrites, answer overrides) as a third, non-HTTP redirect primitive.
   - **Parking**: per-hostname customizable parking pages for DDNS hosts (No-IP offline-mode equivalent), independent of which redirect mode created the record.
   - **Precedence**: CNAME-encoded mode wins when a name has both, reflecting redirect.center as the primary replacement target (BIND + redirect.center is the stated primary use case); the TXT directive is only consulted when no CNAME-encoded target resolves.
-- **Data zones** — engine for serving curated datasets as DNS zones from CI-processed releases, DNSSEC-signed, with HTTP 302 redirector and JSON gateway for reverse lookup and full-text search. **cvedex is the flagship dataset**: CVE IDs as `YYYY-NNNNN.<zone>` labels (default zone `cve.`); future datasets (MAC vendors, ASN, TLD metadata) ride the same engine with no new code paths.
+- **Data zones** — serves curated datasets as DNS zones, with DNSSEC signing, HTTP redirects, a JSON gateway, and full-text search. **cvedex is the flagship dataset**: CVE IDs use `YYYY-NNNNN.<zone>` labels (default zone `cve.`); future datasets may include MAC vendors, ASN, and TLD metadata.
 - **Tor** — `.onion` resolution (and `.exit` handling) per RFC 7686, optional resolution egress through Tor, optional exposure of the server (DNS + UI) as a hidden service; a special case of the generalized outbound proxy support (SOCKS5/HTTP).
 
 ### Records & zone features
@@ -198,7 +193,7 @@ Each zone and listener can use its own role and policy settings.
 - **Scheduled record changes**: queue changes for a maintenance window with optional auto-revert after a set duration.
 - **SOA serial policy** per zone: date-based `YYYYMMDDnn` (default), unixtime, or plain increment — always auto-managed.
 - **IDN**: Unicode names throughout UI/API, punycode on the wire.
-- **Zone versioning**: full history with diff and rollback; **git-backed zone sync** optionally commits and pushes rendered BIND-format zone files to a remote on every change.
+- **Zone versioning**: full history with diff and rollback; optional git synchronization publishes zone changes in BIND format.
 
 ### ISC BIND compatibility & migration
 
@@ -241,7 +236,7 @@ Each zone and listener can use its own role and policy settings.
 
 ### Forwarders & upstream policy
 
-- **Built-in catalog** (each profile ships Do53 v4+v6 IPs, DoT hostname, DoH URL): **Cloudflare** (standard — *default primary* — plus Malware 1.1.1.2 and Family 1.1.1.3), **Google** (*default secondary*; unfiltered like Cloudflare so failover never changes what resolves), **Quad9** (filtered 9.9.9.9 / unfiltered 9.9.9.10), **OpenDNS** (standard/FamilyShield), **AdGuard DNS** (standard/Family), **dns0.eu**, **Mullvad**, and **Custom** (any endpoint, any transport).
+- **Built-in catalog**: profiles for **Cloudflare** (standard — *default primary* — plus Malware 1.1.1.2 and Family 1.1.1.3), **Google** (*default secondary*; unfiltered like Cloudflare so failover never changes what resolves), **Quad9** (filtered 9.9.9.9 / unfiltered 9.9.9.10), **OpenDNS** (standard/FamilyShield), **AdGuard DNS** (standard/Family), **dns0.eu**, **Mullvad**, and **Custom** (any endpoint, any transport). Profiles provide Do53, DoT, and DoH endpoints where supported.
 - **Primary + secondary pair required** (must differ; chosen in setup wizard). Rollover on timeout, SERVFAIL streaks, or sustained latency past threshold; continuous health probes; automatic fail-back to primary after a cooldown (no flapping).
 - **Conditional forwarding** by subnet, domain, TLD, or regex; per-client-group pair overrides; local cache layer in front of forwarding.
 - **Forwarding scope**: forwarding completes answers redxt itself doesn't hold — either no record at all, or a record type it isn't authoritative for on a zone it does hold — it is not general-purpose open recursion for arbitrary third-party domains (see "Open-resolver amplification/reflection" in Threat model).
@@ -266,16 +261,16 @@ Each zone and listener can use its own role and policy settings.
 
 Cluster nodes use authenticated membership, shared secrets, heartbeats, and primary election. A minority partition cannot accept management writes; DNS query service continues from each node's available data. redxt-specific behavior:
 
-- **Cluster nodes**: every node serves every zone authoritatively and runs the full HTTP surface; zone data rides the spec's sync. "Secondary" is not something users configure — ns1/ns2.redxt.us are simply cluster nodes.
-- **Scheduled tasks**: certificate renewal, GeoIP and blocklist updates, cve updates, daily backups, and update checks run on one cluster node; cleanup and health checks run on every node.
-- **Agent** (`redxt-agent`): **pure DNS data plane** — serves synced zones authoritatively, recursion/forwarding, blocklists, and client-group policies over **Do53/DoT/DoQ**; **DoH supported but disabled by default** and, when enabled, the listener handles DNS queries only; zero management listener. Enrolls with an agent token; configured entirely from the server admin UI (spec agent pages) with redxt-specific per-agent settings: zone scope (all or selected), assigned policies/blocklists, forwarder pair (inherit or override), listener toggles. Drop a binary, paste a token, instant secondary.
+- **Cluster nodes**: every node serves every assigned zone authoritatively and provides the same management experience. ns1/ns2.redxt.us are cluster nodes.
+- **Scheduled maintenance**: certificate renewal, GeoIP and blocklist updates, cve updates, backups, update checks, cleanup, and health reporting are coordinated across the cluster.
+- **Agent** (`redxt-agent`): serves assigned zones authoritatively, recursion/forwarding, blocklists, and client-group policies over Do53, DoT, and DoQ. DoH is optional and disabled by default. Agents have no management interface and enroll with a scoped agent token; administrators assign zone scope, policies, blocklists, forwarders, and listener choices from the server.
 - **Standards interop**: AXFR/IXFR/NOTIFY (+TSIG, +XoT) and **catalog zones (RFC 9432)** so third-party servers can be secondaries of redxt and vice versa — zone transfer (primary and secondary roles) is in scope for v1, not deferred.
 - **CLI** (`redxt-cli`): full management parity, rndc-equivalent operations, the diagnostics suite, and token authentication.
-- **Anycast-safe**: stateless query path on every node and agent.
+- **Anycast-safe**: any eligible node or agent can answer a query for its assigned data.
 
 ### Public service hosts
 
-Subdomains the built-in HTTP server answers on the instance domain (redxt.us reference):
+Subdomains offered on the instance domain (redxt.us reference):
 
 | Host | Serves |
 |---|---|
@@ -314,12 +309,12 @@ In both `redxt-cli` and the web UI: dig/doggo-inspired query tool, deliberately 
 
 ### Integration & IaC
 
-- **Terraform provider — first-class deliverable from v1**: full resource coverage (zones, records, templates, keys, policies, DDNS hosts, agents' assignments) against the REST API with org-scoped tokens; the API is designed with the provider as a primary consumer.
+- **Terraform provider — first-class deliverable from v1**: full resource coverage (zones, records, templates, keys, policies, DDNS hosts, agents' assignments) through the REST API with org-scoped tokens.
 - **DHCP hook** for the future casapps DHCP server: RFC 2136+TSIG (identical to ISC dhcpd/Kea) plus a lease-event API; leases become A/AAAA/PTR with automatic expiry cleanup.
 - **Webhooks out**: zone/record changes, security events, policy hits.
 - **Git zone sync**: push-on-change with per-org remotes and credentials.
 - **Backup/restore**: scheduled encrypted snapshots to local path or S3-compatible storage; one-command restore.
-- **GeoIP** (optional local database): geo-aware records and analytics; off by default.
+- **GeoIP** (optional): location-aware records and analytics; off by default.
 
 ### API routes
 

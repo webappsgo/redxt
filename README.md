@@ -53,7 +53,8 @@ Current server endpoints include:
 
 - Health: `GET https://redxt.us/server/healthz`
 - Versioned health: `GET https://redxt.us/api/v1/server/healthz`
-- DNS-over-HTTPS: `GET` or `POST https://redxt.us/dns-query`
+- DNS-over-HTTPS: `GET https://redxt.us/dns-query?dns={base64url-message}`
+  or `POST https://redxt.us/dns-query` with `Content-Type: application/dns-message`
 
 These URLs represent the configured official hostname. The same paths are
 available on a self-hosted instance. See [`docs/api.md`](docs/api.md) for the

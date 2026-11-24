@@ -17,6 +17,23 @@ and stay in sync.
 Content negotiation is honored on every route (`Accept:
 application/json`, `text/plain`, `text/html` where applicable).
 
+## DNS-over-HTTPS
+
+The native DoH endpoint is served at `/dns-query` over HTTPS and uses the
+same authoritative answer engine as the UDP/TCP DNS listener. A trusted
+reverse proxy may terminate TLS and report the effective scheme through the
+trusted-proxy configuration.
+
+- `GET /dns-query?dns={base64url-message}` — the `dns` value is unpadded
+  base64url-encoded DNS wire data.
+- `POST /dns-query` — send DNS wire data with
+  `Content-Type: application/dns-message`.
+
+Successful DNS exchanges return `application/dns-message`; a DNS-level error
+such as REFUSED is carried in the DNS response rather than converted to an
+HTTP error. Recursive resolution and other encrypted transports are not
+implemented yet.
+
 ## Swagger UI
 
 - UI: `/server/docs/swagger`

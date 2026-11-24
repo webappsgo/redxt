@@ -4,7 +4,7 @@
 
 ```bash
 docker run -d \
-  --name "redxt-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  --name "redxt-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')" \
   -p 172.17.0.1:64580:80 \
   -p 53:53/tcp \
   -p 53:53/udp \

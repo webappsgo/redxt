@@ -6,15 +6,16 @@ UDP/TCP and DNS-over-HTTPS. Recursive resolution, forwarding, DNS firewall,
 hosted dynamic DNS, HTTP redirects, DNS-distributed data, clustering, and
 managed-agent workflows are product requirements that remain in progress.
 
-One server process for every DNS role, with no required external service dependency.
+The product is intended to consolidate DNS roles in one service; only the
+authoritative and DoH surfaces described above are currently implemented.
 
 ## Quick Start
 
 ```bash
 # Docker
-docker run --name "redxt-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -p 172.17.0.1:64580:80 -p 53:53/tcp -p 53:53/udp ghcr.io/webappsgo/redxt:latest
+docker run --name "redxt-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')" -p 172.17.0.1:64580:80 -p 53:53/tcp -p 53:53/udp ghcr.io/webappsgo/redxt:latest
 
-# Binary
+# Local development binary
 ./redxt-linux-amd64 --config server.yml
 ```
 
@@ -31,8 +32,9 @@ created.
 - Companion CLI and agent binaries with functionality still under
   development
 
-See [`TODO.AI.md`](../TODO.AI.md) for the current implementation backlog and
-[`IDEA.md`](../IDEA.md) for the complete product requirements.
+See the [implementation backlog](https://github.com/webappsgo/redxt/blob/main/TODO.AI.md)
+for current status and [IDEA.md](https://github.com/webappsgo/redxt/blob/main/IDEA.md)
+for the product requirements.
 
 ## Documentation
 

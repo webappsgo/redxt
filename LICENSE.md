@@ -28,8 +28,11 @@ SOFTWARE.
 |---------|---------|---------|-----------|
 | gopkg.in/yaml.v3 | v3.0.1 | MIT | 2006-2011 Kirill Simonov, 2011-2019 Canonical Ltd |
 | github.com/oschwald/maxminddb-golang | v1.13.1 | ISC | 2015 Gregory J. Oschwald |
+| golang.org/x/text | v0.44.0 | BSD-3-Clause | 2009 The Go Authors |
 
 Full license texts available at: https://spdx.org/licenses/
+
+BSD-3-Clause: neither the names of the copyright holders nor the names of their contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 This list is regenerated as dependencies are added — see `go-licenses csv ./...`.
 

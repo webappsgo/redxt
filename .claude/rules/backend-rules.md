@@ -1,40 +1,43 @@
-# Backend Rules (PART 9, 10, 11, 32)
+# Backend, Database, Security & Overlay Network Rules (PART 9, 10, 11, 32)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
 ## CRITICAL - NEVER DO
-- Leak stack traces or internal errors to clients in production
-- Skip connection pooling / query timeouts on any DB driver
-- Store passwords in plaintext or with bcrypt — Argon2id only
-- Treat GeoIP or any single signal as the sole access-control gate
-- Run relay/exit/proxy functions on the Tor hidden service — app-scoped only
-- Auto-enable I2P — opt-in only via `features.i2p.enabled`
+- Return internal error details, credentials, tokens, session material, full connection URLs, or sensitive request data to public endpoints or logs.
+- Use unparameterized SQL, omit connection pooling/query timeouts, or perform destructive schema changes.
+- Treat SQLite as safe for concurrent writes without the per-file read/write handle and transaction contract in PART 10.
+- Treat GeoIP, a blocklist, or any single signal as the sole security/access-control gate.
+- Let untrusted inbound requests choose destinations fetched through Tor; expose Tor SOCKS beyond loopback or enable relay/exit behavior.
+- Enable I2P unless explicitly configured; it is optional and its platform/container conditions are specified in PART 32.
 
 ## CRITICAL - ALWAYS DO
-- Support multiple DB drivers via `DATABASE_DRIVER`/`DATABASE_URL` (sqlite, libsql/turso, postgres, mysql, mssql, mongodb)
-- Implement graceful panic recovery (log + 500) in every mode
-- Implement cluster support for horizontal scaling (cluster nodes = other redxt instances)
-- Auto-enable Tor hidden service when a Tor binary is found (PART 32.1, required)
-- Enforce security headers, CSP, and public-endpoint safety principles on every response
+- Support the database modes and drivers actually specified in PART 10; use SQLite for the default single-node mode and remote database/cache requirements for clustering.
+- Use contextual query/transaction timeouts, pooled connections, idempotent additive schema upgrades, and transaction rollback discipline.
+- Preserve the distinction between cluster nodes (redxt instances) and agents/managed external nodes.
+- Apply panic recovery and the public-endpoint disclosure tiers, security headers, CSP, and structured logging requirements.
+- Hash passwords with Argon2id and tokens with SHA-256; never persist raw credentials.
+- Auto-enable the required Tor hidden-service behavior when available, while keeping outbound requests app-scoped and Tor relay/exit disabled.
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Spec Reference |
 |----------|--------|----------------|
-| Password hashing | Argon2id | PART 11 |
-| Token hashing | SHA-256 | PART 11 |
-| Tor hidden service | Required, auto-enabled if Tor found | PART 32.1 |
-| I2P eepsite | Optional, opt-in only | PART 32.2 |
-| Cluster vs managed node | Cluster = other redxt instances; managed = external resources | PART 10 |
+| Default database mode? | Local SQLite for a single instance | PART 10 |
+| What enables cluster mode? | Shared supported remote database and cache as specified | PART 10 |
+| Password/token storage? | Argon2id password hashes; SHA-256 token hashes | PART 11 |
+| May inbound visitors use the app as a Tor proxy? | No; outbound Tor destinations must be app-determined | PART 32 |
 
 ## TERMINOLOGY
 | Term | Meaning |
 |------|---------|
-| Cluster Node | Another instance of redxt |
-| Managed Node | External DNS/redirect target monitored by redxt |
+| Cluster node | Another redxt server instance sharing cluster services |
+| Agent | Purpose-specific worker; never a cluster node |
+| Public-safe data | Information explicitly allowed for unauthenticated disclosure by PART 11 |
 
 ## QUICK REFERENCE
-- Caching: config-driven, disabled by default in development for hot reload
-- Error responses: unified format across REST/Swagger/GraphQL (PART 9, 14)
+- PART 9 defines error handling, recovery, and caching.
+- PART 10 defines database drivers, schema, pooling, SQLite concurrency, and cluster behavior.
+- PART 11 defines security, credential handling, endpoint disclosure, and logging.
+- PART 32 defines Tor/I2P; Tor hidden-service and outbound-client trust boundaries are separate.
 
 ---
 For complete details, see AI.md PART 9, 10, 11, 32

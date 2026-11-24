@@ -1,52 +1,43 @@
-# AI Rules (PART 0, 1)
+# AI Assistant Rules (PART 0, 1)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
 ## CRITICAL - NEVER DO
-- Guess or assume — READ THE SPEC or ASK
-- Implement without reading the relevant PART first
-- Modify AI.md PART content (read-only spec)
-- Add features not in spec without asking
-- Use "I think" or "probably" — KNOW from spec or ASK
-- Ask multiple plain-text questions in separate messages — use the AskUserQuestion wizard
-- Use generic placeholder content ("Your app name", "Feature 1")
-- Create `/server/about` or `/server/help` with placeholder text — source from IDEA.md
-- Leave TODO comments in committed code — implement fully or don't implement
-- Create stub functions or "future" placeholders
-- Ship partial implementations — every feature must be 100% complete
-- Rely on memory for spec content — read the relevant PART when needed
+- Guess requirements, values, or behavior; inspect the governing spec or ask when it is genuinely silent.
+- Implement before reading the task's relevant AI.md PART and project intent in IDEA.md.
+- Modify AI.md; it is the read-only implementation authority. Resolve conflicts in lower-priority files.
+- Skip required implementation sections, leave stubs, or replace complete work with TODOs.
+- Claim a check passed without running it and inspecting its result.
+- Use host execution for project development; use the prescribed isolated/container workflow.
 
 ## CRITICAL - ALWAYS DO
-- Read the relevant PART before implementing ANY feature
-- Search AI.md before asking questions (the answer is likely there)
-- Follow spec EXACTLY — no unrequested "improvements"
-- Update IDEA.md when project-specific features change
-- Keep all docs in sync with code
-- When unsure, ASK — never guess or assume
-- Source `/server/about` and `/server/help` content from IDEA.md
-- Commit COMMIT/NEVER/MUST rules to memory each session
+- Treat SPEC.md (when present) as the project override, then AI.md, then global guidance; IDEA.md defines product intent.
+- Read only relevant spec sections before work, revisit those sections during work, and check compliance before reporting completion.
+- Search the repository and relevant docs before asking questions or creating duplicate mechanisms.
+- Translate every human-readable string and keep user-facing docs synchronized with implementation.
+- Preserve existing user changes; make complete, scoped changes and report limitations truthfully.
+- Follow the complete implementation and compliance checklist in AI.md PART 0 and PART 1.
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Spec Reference |
 |----------|--------|----------------|
-| Where do business-logic answers live? | IDEA.md first, then AI.md | PART 0 |
-| Can AI.md be edited? | No — read-only spec | PART 0, 1 |
-| How to activate optional PART 34-36? | Declare in SPEC.md | PART 0 |
-| What if IDEA.md is non-conforming? | Migrate before any other work | PART 0 |
+| Source of implementation requirements? | SPEC.md overrides, otherwise AI.md; IDEA.md supplies product behavior | PART 0 |
+| May AI.md be edited during project work? | No; it is read-only | PART 0 |
+| How are optional PARTs 34–36 activated? | Project activation is defined by the spec's SPEC.md/IDEA.md rules; verify before implementation | PART 0 |
+| What if the spec appears contradictory? | Verify both passages and log a verified internal defect in the designated tracker; do not silently choose | PART 0 |
 
 ## TERMINOLOGY
 | Term | Meaning |
 |------|---------|
-| server | `redxt` main binary |
-| client | `redxt-cli` companion CLI/TUI |
-| agent | `redxt-agent` (enabled — PART 33) |
-| Server Admin | manages the app, not an OS user |
-| Regular User | end-user account (PART 34, enabled) |
+| `{project_dir}` | Git repository root, resolved with `git rev-parse --show-toplevel` |
+| AI.md | Read-only implementation specification |
+| IDEA.md | Project-specific WHAT: scope, users, flows, constraints |
+| SPEC.md | Project-specific rule override when present |
 
 ## QUICK REFERENCE
-- Session start: read CLAUDE.md → check `.claude/rules/` freshness → read IDEA.md → proceed
-- Every code change must trace to a specific AI.md PART or IDEA.md line
-- Findings not fixed immediately go into TODO.AI.md, never left only in chat
+- Before changes: inspect relevant rule file, AI.md PART, IDEA.md, and existing implementation.
+- During changes: keep edits scoped, preserve work, and implement complete behavior.
+- Before reporting: run only the checks authorized by the task and report exact commands/results.
 
 ---
 For complete details, see AI.md PART 0, 1

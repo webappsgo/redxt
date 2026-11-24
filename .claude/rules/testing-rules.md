@@ -1,35 +1,43 @@
-# Testing / Docs / i18n Rules (PART 29, 30, 31)
+# Testing, Documentation, i18n & Accessibility Rules (PART 29, 30, 31)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
 ## CRITICAL - NEVER DO
-- Run tests or debugging against the host system — use Docker/Incus per `execution_hierarchy.md`
-- Use the project directory for scratch/temp test output — use the project-org tempdir structure
-- Commit runtime-generated config files
-- Skip browser E2E beta testing (`tests/e2e.sh`, headless Chromium) — required by PART 29
-- Ship translated strings without a11y review (PART 31)
+- Run project tests, builds, service operations, or debugging on the host when the spec requires isolation.
+- Use production/dev compose for automated testing, project-tree volumes for runtime state, or project paths for scratch output.
+- Treat unit coverage as endpoint coverage; endpoint routes and content-negotiation variants have separate required coverage.
+- Commit runtime-generated configuration, test databases, logs, or build artifacts.
+- Ship hardcoded human-readable strings, locale files with mismatched keys/plurals, or untranslated user-facing errors.
+- Leave MkDocs/ReadTheDocs docs, accessibility, or localization requirements incomplete.
 
 ## CRITICAL - ALWAYS DO
-- Provide `tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh`, `tests/e2e.sh` (all required)
-- Keep Go unit tests as `*_test.go` next to the code they test
-- Meet the required test coverage gate before commit
-- Configure `mkdocs.yml` + `.readthedocs.yaml` + `docs/requirements.txt` + theme CSS (dark.css required, light.css optional)
-- Support i18n string tables and mobile a11y from day one
+- Follow PART 29's container/VM safety, project-scoped temp directory, unit/integration test, endpoint, content-negotiation, and coverage requirements.
+- Keep Go unit tests beside source and exercise every IDEA.md route and required HTML/JSON/plain-text representation.
+- Maintain the required test scripts and use isolated Docker/Incus/VM paths as defined by PART 29.
+- Maintain the MkDocs Material/ReadTheDocs configuration, required pages, navigation, and theme assets from PART 30.
+- Translate all human-readable strings across server, client, agent, web, API, docs surfaces, and emails; use one shared locale registry/file set with key parity and English fallback.
+- Meet WCAG accessibility, keyboard, screen-reader, contrast, responsive, and RTL requirements from PART 31.
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Spec Reference |
 |----------|--------|----------------|
-| Test host | Docker/Incus only, never bare host | PART 29 |
-| Docs generator | MkDocs Material via ReadTheDocs | PART 30 |
-| i18n scope | All user-facing strings, WCAG a11y | PART 31 |
+| Where do tests/builds run? | Isolated containers or VMs according to PART 29 and execution hierarchy | PART 29 |
+| What is the default unit coverage gate? | At least 60%; project-specific server endpoint coverage is 100% where specified | PART 29 |
+| Which doc system is required? | MkDocs Material published through ReadTheDocs | PART 30 |
+| What is the minimum locale set? | English, Spanish, French, Arabic, German, Italian; every supported locale must be complete | PART 31 |
 
 ## TERMINOLOGY
 | Term | Meaning |
 |------|---------|
-| E2E test | Headless-Chromium browser test in `tests/e2e.sh` |
+| Unit test | Fast test colocated with the code under test |
+| Endpoint coverage | Integration verification of every defined route and required response format |
+| Supported locale | Complete embedded locale with matching registry and English key set |
 
 ## QUICK REFERENCE
-- Required docs pages: index, installation, configuration, api, cli, admin, security, integrations, development
+- Content negotiation is tested for browser HTML and plain text; API JSON and plain text; `.txt` routes where supported.
+- Unit coverage and endpoint coverage are separate gates; verify each threshold in PART 29.
+- `tests/` outputs and runtime state belong in project-scoped OS temp directories.
+- Read PARTs 29, 30, and 31 for required scripts, docs pages/theme, locale registry, translation use, and accessibility.
 
 ---
 For complete details, see AI.md PART 29, 30, 31

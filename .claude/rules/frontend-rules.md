@@ -1,39 +1,41 @@
-# Frontend / Admin Panel Rules (PART 16, 17)
+# Web Frontend & Admin Panel Rules (PART 16, 17)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
 ## CRITICAL - NEVER DO
-- Use client-side rendering frameworks (React/Vue) — server-side Go templates only
-- Add JavaScript for anything HTML5+CSS already solves (forms, validation, show/hide, dialogs, tabs) — JS is a last resort
-- Hardcode colors — use CSS custom properties for the theme system
-- Let long strings break mobile layout — use word-break CSS
-- Put the admin panel behind a fixed, non-configurable path
+- Use a client-side rendering framework; render pages with Go `html/template` and server-side handlers.
+- Pass user-controlled content to trusted template/HTML types without the specified sanitization.
+- Add JavaScript for behavior that native HTML and CSS can provide, or make a feature unusable with JavaScript disabled.
+- Put page styles inline or hardcode theme colors; use the shared CSS/theme system.
+- Expose admin navigation or authenticated/private pages through public routes, sitemap, feeds, or cacheable responses.
 
 ## CRITICAL - ALWAYS DO
-- Mobile-first responsive CSS (breakpoints: tablet 768px, desktop 1024px)
-- Support light/dark/auto theme, project-wide and non-negotiable
-- Every feature must work without JavaScript
-- Isolate the admin panel under `/server/{admin_path}` (configurable path, default `administration`)
-- Implement the first-run setup wizard for the Primary Admin
-- Apply the same theme to Swagger/GraphQL UIs as the rest of the app
+- Build a complete, mobile-first, accessible frontend that consumes the backend API and exposes browser workflows for user-facing features.
+- Use shared page partials, theme-matched error responses, route normalization, and the security/privacy rules in PART 16.
+- Meet WCAG AA accessibility, keyboard and screen-reader support, responsive layouts, and light/dark theme contrast.
+- Implement the admin path and setup/auth flows exactly as configured by PART 17; keep server admins distinct from regular users.
+- Source project-specific public/about/help/privacy content from IDEA.md and deployment facts from configuration; never use generic placeholder copy.
+- Localize every human-readable frontend/admin string and keep templates and assets embedded as specified.
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Spec Reference |
 |----------|--------|----------------|
-| Rendering | Server-side Go templates | PART 16 |
-| Theme default | auto (light/dark via `prefers-color-scheme`) | PART 16 |
-| Admin path | Configurable, default `administration` | PART 17 |
-| Server Admin vs Regular User | Separate DB tables, never merged | PART 17 |
+| Rendering model? | Server-rendered Go `html/template` | PART 16 |
+| Is JavaScript required for core workflows? | No; it is progressive enhancement only | PART 16 |
+| What pages may be indexed? | Only public pages allowed by robots and the PART 16 sitemap/feed rules | PART 16 |
+| Are server admins and regular users one account type? | No; distinct roles and storage | PART 17 |
 
 ## TERMINOLOGY
 | Term | Meaning |
 |------|---------|
-| admin_path | Configurable URL segment for the admin panel |
-| Primary Admin | First admin account, cannot be deleted |
+| Progressive enhancement | Optional JavaScript improves a workflow that already works without it |
+| Primary Admin | First server admin with the protections defined by PART 17 |
+| `admin_path` | Configured admin URL segment with canonical routing rules |
 
 ## QUICK REFERENCE
-- Breakpoints: `@media (min-width: 768px)` tablet+, `@media (min-width: 1024px)` desktop+
-- Error pages must match the active theme
+- Use native forms, validation, navigation, dialogs, and CSS where supported; scripts remain external and minimal.
+- Apply the shared theme to normal, admin, error, and generated documentation interfaces.
+- PART 17 controls setup, auth, admin settings, roles, sessions, and administration routes.
 
 ---
 For complete details, see AI.md PART 16, 17

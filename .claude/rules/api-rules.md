@@ -1,34 +1,40 @@
-# API Rules (PART 13, 14, 15)
+# Health, API Structure & SSL/TLS Rules (PART 13, 14, 15)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
 ## CRITICAL - NEVER DO
-- Let REST, Swagger, and GraphQL drift out of sync — all three describe the same API surface
-- Skip API versioning (`/api/{api_version}/...`)
-- Hand-roll SSL cert management — use the built-in Let's Encrypt integration
-- Return inconsistent error/response shapes across endpoints
+- Implement routes that are absent from the project's API inventory or keep route aliases after the spec requires canonical terms.
+- Let native/protocol routes, REST, OpenAPI/Swagger, GraphQL, and frontend behavior drift from the specified contracts.
+- Expose health, version, or debug information beyond the disclosure and authentication rules for that endpoint.
+- Return inconsistent response/error shapes, leak secrets, or omit request ID propagation where required.
+- Hand-roll certificate lifecycle or bypass the built-in TLS/ACME rules.
 
 ## CRITICAL - ALWAYS DO
-- Expose REST, Swagger UI (`/server/docs/swagger`, JSON at `/api/{api_version}/server/swagger`, alias `/api/swagger`), and GraphiQL (`/server/docs/graphql`, POST at `/api/{api_version}/server/graphql`, alias `/api/graphql`)
-- Use a unified response format across all three API surfaces
-- Auto-enable Let's Encrypt HTTP-01 (port 80) / TLS-ALPN-01 (port 443)
-- Provide health check endpoints (`/server/healthz`) that don't require auth
+- Keep the health/version endpoints and their authentication and disclosure rules aligned with PART 13.
+- Use versioned, canonical API routes and the request/response, content-negotiation, validation, and middleware order in PART 14.
+- Include every project-defined native and compatibility API route in IDEA.md's `### API routes` inventory.
+- Keep OpenAPI/Swagger and GraphQL descriptions and schemas synchronized with the implemented API where enabled by the spec.
+- Follow PART 15 for TLS listeners, certificate storage, ACME challenge selection, renewal, and failure behavior.
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Spec Reference |
 |----------|--------|----------------|
-| API surfaces | REST + Swagger + GraphQL, all in sync | PART 14 |
-| Health endpoint | `/server/healthz` | PART 13 |
-| SSL | Built-in Let's Encrypt, auto on 443 | PART 15 |
+| Where are project-specific API routes declared? | IDEA.md `### API routes` inventory | PART 0, 14 |
+| How are public errors represented? | Shared API error contract defined by PART 14 | PART 14 |
+| Which endpoints may be unauthenticated? | Only those explicitly designated public by PARTs 13–15 and the project spec | PART 13, 14 |
+| How are certificates managed? | Built-in TLS/ACME implementation per PART 15 | PART 15 |
 
 ## TERMINOLOGY
 | Term | Meaning |
 |------|---------|
-| api_version | Versioned API path segment, e.g. `v1` |
+| Native route | Protocol-defined path such as DNS, DoH, RDAP, or compatibility endpoints |
+| API version | Canonical version segment used by the applicable REST routes |
+| ACME challenge | Certificate domain-control validation method chosen under PART 15 |
 
 ## QUICK REFERENCE
-- Trailing-slash 301 normalization applies to doc/API paths
-- Content negotiation supported across REST responses
+- Trace route registration, auth, validation, and response shape to PART 14 plus IDEA.md.
+- Health/version behavior is specified in PART 13; TLS and Let's Encrypt behavior in PART 15.
+- Localization applies to human-readable API/schema/error text (PART 31).
 
 ---
 For complete details, see AI.md PART 13, 14, 15

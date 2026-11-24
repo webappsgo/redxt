@@ -170,7 +170,9 @@ jobs:
         id: metadata
         run: |
           # ghcr.io requires a lowercase image path
-          echo "IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> "$GITHUB_ENV"
+          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
           PROJECT_NAME="${{ github.event.repository.name }}"
           echo "PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
           echo "project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"

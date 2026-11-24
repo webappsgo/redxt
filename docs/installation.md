@@ -6,17 +6,19 @@
 docker run -d \
   --name "redxt-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -p 172.17.0.1:64580:80 \
-  -v ./volumes/config:/config \
-  -v ./volumes/data:/data \
+  -p 53:53/tcp \
+  -p 53:53/udp \
+  -v ./docker/volumes/config:/config \
+  -v ./docker/volumes/data:/data \
   ghcr.io/webappsgo/redxt:latest
 ```
 
-`docker-compose.yml` (production), `docker-compose.dev.yml` (hot-reload
-development), and `docker-compose.test.yml` (`:devel` image with
-`DEBUG: true`, `MODE: development`) are provided at the repo root.
+The production and development compose files are in `docker/`; the test
+compose file is reserved for automated tests. The development compose uses
+DNS port `5353` so it can coexist with a production resolver on the host.
 
 ```bash
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 ## Binary

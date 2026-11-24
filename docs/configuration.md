@@ -60,8 +60,11 @@ The built-in DNS listener uses UDP and TCP on port 53 by default. It follows
 `server.listen` unless `dns.address` names a dedicated interface. Set
 `dns.enabled: false` to disable it or `dns.port` to override the standard
 port. `DNS_PORT` overrides `dns.port` at runtime and is never persisted.
-The current listener serves verified primary and secondary zones; recursive
-resolution and encrypted DNS transports are not available yet.
+The current listeners serve verified primary and secondary zones. DNS-over-
+HTTPS is available at `/dns-query` on the HTTPS listener (GET and POST using
+`application/dns-message`); requests must arrive over TLS or through a trusted
+proxy that reports HTTPS. Recursive resolution and other encrypted transports
+(DNS-over-TLS, DNS-over-QUIC, and DNSCrypt) are not available yet.
 
 Mode and debug behavior:
 

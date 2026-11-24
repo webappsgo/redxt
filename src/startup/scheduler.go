@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/webappsgo/redxt/src/common/version"
+	"github.com/webappsgo/redxt/src/config"
 	"github.com/webappsgo/redxt/src/database"
 	"github.com/webappsgo/redxt/src/scheduler"
 )
@@ -34,117 +35,76 @@ func (s *Server) startScheduler(ctx context.Context) error {
 	tasks := s.Config.Server.Scheduler.Tasks
 
 	if def, ok := tasks["session_cleanup"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "session_cleanup", Schedule: def.Schedule, Enabled: def.Enabled,
-			Run: s.cleanupExpiredSessions,
-		}); err != nil {
+		if err := sched.Register(configuredTask("session_cleanup", def, s.cleanupExpiredSessions)); err != nil {
 			return err
 		}
 	}
 	if def, ok := tasks["token_cleanup"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "token_cleanup", Schedule: def.Schedule, Enabled: def.Enabled,
-			Run: s.cleanupExpiredTokens,
-		}); err != nil {
+		if err := sched.Register(configuredTask("token_cleanup", def, s.cleanupExpiredTokens)); err != nil {
 			return err
 		}
 	}
 	if def, ok := tasks["log_rotation"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "log_rotation", Schedule: def.Schedule, Enabled: def.Enabled,
-			Run: func(context.Context) error { return s.Log.Reopen() },
-		}); err != nil {
+		run := func(context.Context) error { return s.Log.Reopen() }
+		if err := sched.Register(configuredTask("log_rotation", def, run)); err != nil {
 			return err
 		}
 	}
 	if def, ok := tasks["cluster_heartbeat"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "cluster_heartbeat", Schedule: def.Schedule, Enabled: def.Enabled,
-			Run: s.clusterHeartbeat,
-		}); err != nil {
+		if err := sched.Register(configuredTask("cluster_heartbeat", def, s.clusterHeartbeat)); err != nil {
 			return err
 		}
 	}
 	if def, ok := tasks["healthcheck_self"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "healthcheck_self", Schedule: def.Schedule, Enabled: def.Enabled,
-			Run: s.selfHealthCheck,
-		}); err != nil {
+		if err := sched.Register(configuredTask("healthcheck_self", def, s.selfHealthCheck)); err != nil {
 			return err
 		}
 	}
 	if s.GeoIP != nil {
 		if def, ok := tasks["geoip_update"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "geoip_update", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: s.refreshGeoIP,
-			}); err != nil {
+			if err := sched.Register(configuredTask("geoip_update", def, s.refreshGeoIP)); err != nil {
 				return err
 			}
 		}
 	}
 	if def, ok := tasks["update_check"]; ok {
-		if err := sched.Register(scheduler.Task{
-			Name: "update_check", Schedule: def.Schedule, Enabled: def.Enabled,
-			RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-			Run: s.checkForUpdate,
-		}); err != nil {
+		if err := sched.Register(configuredTask("update_check", def, s.checkForUpdate)); err != nil {
 			return err
 		}
 	}
 	if s.Backup != nil {
 		if def, ok := tasks["backup_daily"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "backup_daily", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: s.runBackupDaily,
-			}); err != nil {
+			if err := sched.Register(configuredTask("backup_daily", def, s.runBackupDaily)); err != nil {
 				return err
 			}
 		}
 		if def, ok := tasks["backup_hourly"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "backup_hourly", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: s.runBackupHourly,
-			}); err != nil {
+			if err := sched.Register(configuredTask("backup_hourly", def, s.runBackupHourly)); err != nil {
 				return err
 			}
 		}
 	}
 	if s.Tor != nil {
 		if def, ok := tasks["tor_health"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "tor_health", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: s.torHealth,
-			}); err != nil {
+			if err := sched.Register(configuredTask("tor_health", def, s.torHealth)); err != nil {
 				return err
 			}
 		}
 	}
 	if s.I2P != nil {
 		if def, ok := tasks["i2p_health"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "i2p_health", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: s.i2pHealth,
-			}); err != nil {
+			if err := sched.Register(configuredTask("i2p_health", def, s.i2pHealth)); err != nil {
 				return err
 			}
 		}
 	}
 	if s.SSL != nil {
 		if def, ok := tasks["ssl_renewal"]; ok {
-			if err := sched.Register(scheduler.Task{
-				Name: "ssl_renewal", Schedule: def.Schedule, Enabled: def.Enabled,
-				RetryOnFail: def.RetryOnFail, RetryDelay: def.RetryDelay.Duration(),
-				Run: func(ctx context.Context) error {
-					_, err := s.SSL.RenewAll(ctx, time.Now())
-					return err
-				},
-			}); err != nil {
+			run := func(ctx context.Context) error {
+				_, err := s.SSL.RenewAll(ctx, time.Now())
+				return err
+			}
+			if err := sched.Register(configuredTask("ssl_renewal", def, run)); err != nil {
 				return err
 			}
 		}
@@ -155,6 +115,20 @@ func (s *Server) startScheduler(ctx context.Context) error {
 	}
 	s.scheduler = sched
 	return nil
+}
+
+// configuredTask applies the persisted task settings and PART 19's
+// cluster scope to each built-in task before it enters the scheduler.
+func configuredTask(name string, def config.SchedulerTask, run scheduler.Handler) scheduler.Task {
+	return scheduler.Task{
+		Name:         name,
+		Schedule:     def.Schedule,
+		Enabled:      def.Enabled,
+		ClusterAware: scheduler.IsGlobalTask(name),
+		RetryOnFail:  def.RetryOnFail,
+		RetryDelay:   def.RetryDelay.Duration(),
+		Run:          run,
+	}
 }
 
 // stopScheduler drains any in-flight task run before the databases it
@@ -218,8 +192,8 @@ func (s *Server) clusterHeartbeat(ctx context.Context) error {
 // scheduler_history the same as any other task failure, which is what
 // makes it visible to an operator watching the scheduler admin panel.
 func (s *Server) selfHealthCheck(ctx context.Context) error {
-	if err := s.ServerDB.DB.PingContext(ctx); err != nil {
+	if err := s.ServerDB.PingContext(ctx); err != nil {
 		return err
 	}
-	return s.UsersDB.DB.PingContext(ctx)
+	return s.UsersDB.PingContext(ctx)
 }

@@ -4,7 +4,13 @@ on:
   push:
     tags:
       - 'v*'
-      - '[0-9]*.[0-9]*.[0-9]*'
+      - '*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to create and release from the selected ref
+        required: true
+        type: string
 
 concurrency:
   group: release-${{ github.ref }}
@@ -14,14 +20,17 @@ permissions:
   contents: read
 
 env:
-  PROJECT_NAME: redxt
+  PROJECT_NAME: ${{ github.event.repository.name }}
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/go:latest
+      options: "--user 0:0"
     strategy:
+      fail-fast: false
       matrix:
         include:
           - goos: linux
@@ -44,19 +53,36 @@ jobs:
             goarch: arm64
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Run release quality gates
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          go vet ./...
+          staticcheck ./...
+          govulncheck ./...
+          go test ./...
+
+      - name: Validate release tag
+        run: |
+          if ! printf '%s' "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Release tag '$RELEASE_TAG' must use vMAJOR.MINOR.PATCH format"
+            exit 1
+          fi
 
       - name: Set build info
         run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
-          else
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-          fi
-          echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+          echo "VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+          echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
           BUILD_EPOCH=$(date -u +%s)
-          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> "$GITHUB_ENV"
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -71,7 +97,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          LDFLAGS="-s -w -X 'main.Version=${{ env.VERSION }}' -X 'main.CommitID=${{ env.COMMIT_ID }}' -X 'main.BuildEpoch=${{ env.BUILD_EPOCH }}' -X 'main.OfficialSite=${{ env.OFFICIAL_SITE }}'"
+          LDFLAGS="-s -w -X 'main.Version=${VERSION}' -X 'main.CommitID=${COMMIT_ID}' -X 'main.BuildEpoch=${BUILD_EPOCH}' -X 'main.OfficialSite=${OFFICIAL_SITE}'"
           go build -buildvcs=false -trimpath -ldflags "${LDFLAGS}" -o ${{ env.PROJECT_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./src
 
       # CLI build - only if src/client/ directory exists
@@ -82,7 +108,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          LDFLAGS="-s -w -X 'main.Version=${{ env.VERSION }}' -X 'main.CommitID=${{ env.COMMIT_ID }}' -X 'main.BuildEpoch=${{ env.BUILD_EPOCH }}' -X 'main.OfficialSite=${{ env.OFFICIAL_SITE }}'"
+          LDFLAGS="-s -w -X 'main.Version=${VERSION}' -X 'main.CommitID=${COMMIT_ID}' -X 'main.BuildEpoch=${BUILD_EPOCH}' -X 'main.OfficialSite=${OFFICIAL_SITE}'"
           go build -buildvcs=false -trimpath -ldflags "${LDFLAGS}" -o ${{ env.PROJECT_NAME }}-cli-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./src/client
 
       - name: Upload server artifact
@@ -90,6 +116,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          retention-days: 30
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
@@ -97,6 +124,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          retention-days: 30
 
       # Agent build - only if src/agent/ directory exists
       - name: Build Agent
@@ -106,7 +134,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          LDFLAGS="-s -w -X 'main.Version=${{ env.VERSION }}' -X 'main.CommitID=${{ env.COMMIT_ID }}' -X 'main.BuildEpoch=${{ env.BUILD_EPOCH }}' -X 'main.OfficialSite=${{ env.OFFICIAL_SITE }}'"
+          LDFLAGS="-s -w -X 'main.Version=${VERSION}' -X 'main.CommitID=${COMMIT_ID}' -X 'main.BuildEpoch=${BUILD_EPOCH}' -X 'main.OfficialSite=${OFFICIAL_SITE}'"
           go build -buildvcs=false -trimpath -ldflags "${LDFLAGS}" -o ${{ env.PROJECT_NAME }}-agent-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./src/agent
 
       - name: Upload Agent artifact
@@ -115,6 +143,7 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          retention-days: 30
 
       # SBOM is release-level - generate once on the linux/amd64 leg (cyclonedx-gomod is pre-installed in the image)
       - name: Generate SBOM
@@ -127,10 +156,11 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}-sbom
           path: ${{ env.PROJECT_NAME }}-sbom.cdx.json
+          retention-days: 30
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       # create GitHub release + upload assets, plus tag ownership (Ensure release tag)
       contents: write
@@ -140,19 +170,14 @@ jobs:
       attestations: write
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # required: full history needed to inspect and push tags
           fetch-depth: 0
 
       - name: Ensure release tag
         run: |
-          ref="${{ github.ref }}"
-          if [[ "$ref" != refs/tags/* ]]; then
-            echo "::error::release.yml triggered on non-tag ref '$ref'. Releases require a tag push (refs/tags/v...)."
-            exit 1
-          fi
-          tag="${ref#refs/tags/}"
+          tag="$RELEASE_TAG"
           if printf '%s' "$tag" | grep -qP '[[:space:][:cntrl:]]'; then
             echo "::error::Tag '$tag' contains whitespace or control characters and is not a valid GitHub tag name."
             exit 1
@@ -171,34 +196,22 @@ jobs:
           merge-multiple: true
 
       - name: Set version
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          # VERSION for version.txt (strip v if present)
-          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
-          # RELEASE_TAG: add v prefix only if semver without v
-          if [[ "$TAG" == v* ]]; then
-            echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
-          elif [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "RELEASE_TAG=v$TAG" >> $GITHUB_ENV
-          else
-            echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
-          fi
+        run: echo "VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
 
       - name: Create version.txt
-        run: echo "${{ env.VERSION }}" > binaries/version.txt
+        run: echo "$VERSION" > binaries/version.txt
 
       - name: Create source archive
         run: |
           tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
-            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+            -czf binaries/${{ env.PROJECT_NAME }}-${VERSION}-source.tar.gz .
 
       - name: Generate checksums
         run: |
           cd binaries
-          FILES="$(ls)"
-          sha256sum $FILES > sha256.txt
-          sha512sum $FILES > sha512.txt
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS' ! -name 'SHA512SUMS' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS' ! -name 'SHA512SUMS' -print0 | sort -z | xargs -0 sha512sum > SHA512SUMS
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -206,7 +219,7 @@ jobs:
           subject-path: binaries/${{ env.PROJECT_NAME }}-*
 
       - name: Create Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: binaries/*

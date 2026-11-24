@@ -1,0 +1,9 @@
+* @webappsgo
+/.github/ @webappsgo
+/.gitea/ @webappsgo
+/.forgejo/ @webappsgo
+/.gitlab-ci.yml @webappsgo
+/Jenkinsfile @webappsgo
+/docker/ @webappsgo
+/src/auth/ @webappsgo
+/src/crypto/ @webappsgo

@@ -1,0 +1,206 @@
+variables:
+  CGO_ENABLED: "0"
+  GIT_DEPTH: "0"
+  BUILD_IMAGE: casjaysdev/go:latest
+  PROJECT_NAME: redxt
+
+stages:
+  - build
+  - test
+  - security
+  - release
+  - docker
+
+lint:
+  stage: build
+  image: $BUILD_IMAGE
+  script:
+    - go vet ./...
+    - staticcheck ./...
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+build:
+  stage: build
+  image: $BUILD_IMAGE
+  parallel:
+    matrix:
+      - GOOS: [linux, darwin, windows, freebsd]
+        GOARCH: [amd64, arm64]
+  script:
+    - export VERSION="${CI_COMMIT_TAG#v}"
+    - test -n "$VERSION" || VERSION="$(git rev-parse --short=7 HEAD)"
+    - export COMMIT_ID="$(git rev-parse --short=7 HEAD)" BUILD_EPOCH="$(date -u +%s)"
+    - export OFFICIAL_SITE="$(cat site.txt)"
+    - export LDFLAGS="-s -w -X 'main.Version=$VERSION' -X 'main.CommitID=$COMMIT_ID' -X 'main.BuildEpoch=$BUILD_EPOCH' -X 'main.OfficialSite=$OFFICIAL_SITE'"
+    - if [ "$GOOS" = linux ] && [ "$GOARCH" = amd64 ]; then cyclonedx-gomod mod -json -output redxt-sbom.cdx.json; fi
+    - export EXT=""; [ "$GOOS" != windows ] || EXT=.exe
+    - go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-$GOOS-$GOARCH$EXT" ./src
+    - go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-cli-$GOOS-$GOARCH$EXT" ./src/client
+    - go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-agent-$GOOS-$GOARCH$EXT" ./src/agent
+  artifacts:
+    paths: [redxt-*]
+    expire_in: 30 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+test:
+  stage: test
+  image: $BUILD_IMAGE
+  script:
+    - mkdir -p "/tmp/$CI_PROJECT_NAMESPACE"
+    - export COVDIR="$(mktemp -d "/tmp/$CI_PROJECT_NAMESPACE/redxt-XXXXXX")"
+    - go test -coverprofile="$COVDIR/coverage.out" ./...
+    - go tool cover -func="$COVDIR/coverage.out" | awk '/^total:/ {gsub("%", "", $3); if ($3 < 60) exit 1}'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+secret-scan:
+  stage: security
+  image: trufflesecurity/trufflehog:3.100.1@sha256:9c7a8325d43a4af2960d3f21d61a08981d8a1bf0542e007efa2e47097e386452
+  script:
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = schedule ] || [ "$CI_PIPELINE_SOURCE" = web ]; then
+        trufflehog git file://. --results=verified --exclude-paths=.github/trufflehog-exclude.txt --fail
+      else
+        trufflehog git file://. --since-commit HEAD~1 --results=verified,unknown --exclude-paths=.github/trufflehog-exclude.txt --fail
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+workflow-policy:
+  stage: security
+  image: $BUILD_IMAGE
+  script:
+    - bash -ec 'find .github/workflows .gitea/workflows .forgejo/workflows -type f -name "*.yml" -exec sh -c '\''for f; do grep -nE "pull_request_target|uses:[[:space:]]*[^./][^[:space:]]*/[^[:space:]]+@[0-9a-f]{1,39}([^0-9a-f]|$)" "$f" && exit 1 || :; done'\'' sh {} +'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+govulncheck:
+  stage: security
+  image: $BUILD_IMAGE
+  script: ["govulncheck ./..."]
+  rules:
+    - exists: [go.sum]
+
+image-build-for-scan:
+  stage: security
+  image: docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build -f docker/Dockerfile -t redxt:ci .
+    - docker save redxt:ci -o redxt-ci.tar
+  artifacts:
+    paths: [redxt-ci.tar]
+    expire_in: 1 day
+  rules:
+    - exists: [docker/Dockerfile]
+
+image-scan:
+  stage: security
+  image: aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+  needs:
+    - job: image-build-for-scan
+      artifacts: true
+  script:
+    - trivy image --input redxt-ci.tar --exit-code 1 --severity HIGH,CRITICAL
+  rules:
+    - exists: [docker/Dockerfile]
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build
+    - job: test
+    - job: lint
+    - job: secret-scan
+    - job: workflow-policy
+    - job: govulncheck
+      optional: true
+    - job: image-scan
+      optional: true
+  script:
+    - export RELEASE_VERSION="${CI_COMMIT_TAG#v}"
+    - echo "$RELEASE_VERSION" > version.txt
+    - tar --exclude='.git' --exclude='.github' --exclude='.gitea' --exclude='.forgejo' --exclude='redxt-*' --exclude='version.txt' --exclude='SHA256SUMS' --exclude='SHA512SUMS' --exclude='*.tar.gz' -czf "redxt-$RELEASE_VERSION-source.tar.gz" .
+    - FILES="version.txt redxt-*"
+    - sha256sum $FILES > SHA256SUMS
+    - sha512sum $FILES > SHA512SUMS
+  artifacts:
+    paths: [redxt-*, version.txt, SHA256SUMS, SHA512SUMS]
+    expire_in: 30 days
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: "Release artifacts for redxt. See the project changelog for breaking changes."
+    assets:
+      links:
+        - name: "Checksums"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/SHA256SUMS?job=release"
+        - name: "SBOM"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/redxt-sbom.cdx.json?job=release"
+        - name: "Source archive"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/redxt-${CI_COMMIT_TAG}-source.tar.gz?job=release"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+container-publish:
+  stage: docker
+  image: docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - docker buildx create --name redxt-builder --use 2>/dev/null || docker buildx use redxt-builder
+    - export COMMIT_ID="$(git rev-parse --short=7 HEAD)" BUILD_EPOCH="$(date -u +%s)" BUILD_DATE="$(date -u -d @$(date -u +%s) +%Y-%m-%dT%H:%M:%SZ)"
+    - export VERSION="${CI_COMMIT_TAG#v}"; [ -n "$CI_COMMIT_TAG" ] || VERSION="$COMMIT_ID"
+    - export TAGS="-t $CI_REGISTRY_IMAGE:$COMMIT_ID"
+    - if [ "$CI_COMMIT_BRANCH" = main ] || [ "$CI_COMMIT_BRANCH" = master ]; then TAGS="$TAGS -t $CI_REGISTRY_IMAGE:devel"; fi
+    - if [ "$CI_COMMIT_BRANCH" = beta ]; then TAGS="$TAGS -t $CI_REGISTRY_IMAGE:beta"; fi
+    - if [ -n "$CI_COMMIT_TAG" ]; then TAGS="$TAGS -t $CI_REGISTRY_IMAGE:$VERSION -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$(date +%y%m)"; fi
+    - docker buildx build -f docker/Dockerfile --platform linux/amd64,linux/arm64 --build-arg VERSION="$VERSION" --build-arg BUILD_EPOCH="$BUILD_EPOCH" --build-arg BUILD_DATE="$BUILD_DATE" --build-arg COMMIT_ID="$COMMIT_ID" --label "org.opencontainers.image.vendor=webappsgo" --label "org.opencontainers.image.title=redxt" --label "org.opencontainers.image.version=$VERSION" --label "org.opencontainers.image.revision=$COMMIT_ID" --label "org.opencontainers.image.created=$BUILD_DATE" --label "org.opencontainers.image.url=$CI_PROJECT_URL" --label "org.opencontainers.image.source=$CI_PROJECT_URL" --label "org.opencontainers.image.documentation=$CI_PROJECT_URL" --label "org.opencontainers.image.licenses=MIT" $TAGS --push .
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+container-publish-devel:
+  stage: docker
+  image: docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - export BUILD_EPOCH="$(date -u +%s)" BUILD_DATE="$(date -u -d @$(date -u +%s) +%Y-%m-%dT%H:%M:%SZ)"
+    - docker buildx create --name redxt-devel-builder --use 2>/dev/null || docker buildx use redxt-devel-builder
+    - docker buildx build -f docker/Dockerfile.dev --platform linux/amd64,linux/arm64 --build-arg VERSION="$(git rev-parse --short=7 HEAD)" --build-arg BUILD_EPOCH="$BUILD_EPOCH" --build-arg BUILD_DATE="$BUILD_DATE" --build-arg COMMIT_ID="$(git rev-parse --short=7 HEAD)" --label "org.opencontainers.image.vendor=webappsgo" --label "org.opencontainers.image.title=redxt-devel" --label "org.opencontainers.image.version=$(git rev-parse --short=7 HEAD)" --label "org.opencontainers.image.revision=$(git rev-parse --short=7 HEAD)" --label "org.opencontainers.image.created=$BUILD_DATE" --label "org.opencontainers.image.url=$CI_PROJECT_URL" --label "org.opencontainers.image.source=$CI_PROJECT_URL" --label "org.opencontainers.image.documentation=$CI_PROJECT_URL" --label "org.opencontainers.image.licenses=MIT" -t "$CI_REGISTRY_IMAGE:devel" --push .
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'

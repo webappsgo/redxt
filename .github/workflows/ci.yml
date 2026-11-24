@@ -7,6 +7,7 @@ on:
     branches: [main, master]
   schedule:
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,130 +19,237 @@ concurrency:
 jobs:
   lint:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/go:latest
+      options: "--user 0:0"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
       - run: go vet ./...
       - run: staticcheck ./...
 
   test:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/go:latest
+      options: "--user 0:0"
     env:
       CGO_ENABLED: "0"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
       - name: Run tests with coverage
+        id: coverage
         run: |
-          mkdir -p "/tmp/${{ github.repository_owner }}"
-          COVDIR=$(mktemp -d "/tmp/${{ github.repository_owner }}/$(basename "${{ github.repository }}")-XXXXXX")
-          echo "COVDIR=$COVDIR" >> "$GITHUB_ENV"
+          mkdir -p "/tmp/${GITHUB_REPOSITORY_OWNER}"
+          COVDIR=$(mktemp -d "/tmp/${GITHUB_REPOSITORY_OWNER}/$(basename "$GITHUB_REPOSITORY")-XXXXXX")
+          echo "covdir=$COVDIR" >> "$GITHUB_OUTPUT"
           go test -cover -coverprofile="$COVDIR/coverage.out" ./...
-      - name: Enforce coverage threshold
-        run: |
-          THRESHOLD=60
-          PCT=$(go tool cover -func="$COVDIR/coverage.out" | awk '/^total:/ {gsub("%","",$3); print int($3)}')
-          if [ "$PCT" -lt "$THRESHOLD" ]; then
-            echo "::error::coverage $PCT% < threshold $THRESHOLD%"
-            exit 1
-          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: coverage
+          path: ${{ steps.coverage.outputs.covdir }}/coverage.out
+          retention-days: 7
 
   build:
     if: github.event_name != 'schedule'
     needs: [lint, test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/go:latest
+      options: "--user 0:0"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
     env:
       CGO_ENABLED: "0"
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - run: go build -buildvcs=false ./...
-
-  secret-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
-          fetch-depth: 0
-      - name: TruffleHog secret scan
-        uses: trufflesecurity/trufflehog@37b77001d0174ebec2fcca2bd83ff83a6d45a3ab  # v3.95.3
-        with:
-          base: ${{ github.event.before || '' }}
-          head: ${{ github.event.after || github.sha }}
-          extra_args: --only-verified
-
-  workflow-policy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Verify third-party actions are SHA-pinned and no unsafe triggers
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+      - name: Set build metadata
         run: |
-          set -euo pipefail
-          fail=0
-          for f in .github/workflows/*.yml; do
-            [ -f "$f" ] || continue
-            if grep -qE '^[[:space:]]*pull_request_target[[:space:]]*:' "$f"; then
-              echo "::error file=$f::pull_request_target trigger is not permitted"
-              fail=1
-            fi
-            while IFS= read -r line; do
-              ref="$(echo "$line" | sed -E 's/.*uses:[[:space:]]*[^@]+@([^[:space:]]+).*/\1/')"
-              if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-                continue
-              fi
-              echo "::error file=$f::unpinned action reference: $line"
-              fail=1
-            done < <(grep -E '^\s*-?\s*uses:\s*[^./][^[:space:]]*/[^[:space:]]+@' "$f" || true)
-          done
-          exit $fail
-
-  vuln-scan:
-    runs-on: ubuntu-latest
-    container:
-      image: casjaysdev/go:latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - run: govulncheck ./...
+          echo "VERSION=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+          echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+          echo "BUILD_EPOCH=$(date -u +%s)" >> "$GITHUB_ENV"
+          if [ -f site.txt ]; then
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> "$GITHUB_ENV"
+          fi
+      - name: Build server, client, and agent
+        run: |
+          LDFLAGS="-s -w -X 'main.Version=${VERSION}' -X 'main.CommitID=${COMMIT_ID}' -X 'main.BuildEpoch=${BUILD_EPOCH}' -X 'main.OfficialSite=${OFFICIAL_SITE}'"
+          go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-${GOOS}-${GOARCH}${{ matrix.ext }}" ./src
+          go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-cli-${GOOS}-${GOARCH}${{ matrix.ext }}" ./src/client
+          go build -buildvcs=false -trimpath -ldflags "$LDFLAGS" -o "redxt-agent-${GOOS}-${GOARCH}${{ matrix.ext }}" ./src/agent
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: redxt-*
+          retention-days: 7
 
   coverage:
     if: github.event_name != 'schedule'
-    needs: test
-    runs-on: ubuntu-latest
+    needs: [test]
+    runs-on: ubuntu-26.04
+    container:
+      image: casjaysdev/go:latest
+      options: "--user 0:0"
     steps:
-      - run: echo "coverage enforced in test job"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: coverage
+          path: coverage
+      - name: Enforce 60 percent coverage threshold
+        run: |
+          PCT=$(go tool cover -func=coverage/coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+          if ! awk -v pct="$PCT" 'BEGIN { exit !(pct >= 60) }'; then
+            echo "::error::coverage ${PCT}% is below the required 60% threshold"
+            exit 1
+          fi
 
   upload-artifacts:
     if: github.event_name != 'schedule'
-    needs: build
-    runs-on: ubuntu-latest
-    container:
-      image: casjaysdev/go:latest
-    env:
-      CGO_ENABLED: "0"
+    needs: [build]
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - run: go build -buildvcs=false -o redxt-ci-build ./src
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          path: binaries
+          merge-multiple: true
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: redxt-ci-build
-          path: redxt-ci-build
+          name: ci-binaries
+          path: binaries/
+          retention-days: 7
+
+  secret-scan:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Select scan range
+        id: scope
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "results=verified,unknown" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.after }}" >> "$GITHUB_OUTPUT"
+            echo "results=verified,unknown" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=" >> "$GITHUB_OUTPUT"
+            echo "head=" >> "$GITHUB_OUTPUT"
+            echo "results=verified" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: trufflesecurity/trufflehog@3bd2b5887eb0efb8fa18bfd1d296032924e4ffdc  # v3.99.9
+        with:
+          base: ${{ steps.scope.outputs.base }}
+          head: ${{ steps.scope.outputs.head }}
+          extra_args: --results=${{ steps.scope.outputs.results }} --exclude-paths=.github/trufflehog-exclude.txt
+
+  workflow-policy:
+    runs-on: ubuntu-26.04
+    container:
+      image: casjaysdev/go:latest
+      options: "--user 0:0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Verify pinned actions and safe triggers
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          for dir in .github/workflows .gitea/workflows .forgejo/workflows; do
+            [ -d "$dir" ] || continue
+            for file in "$dir"/*.yml; do
+              [ -f "$file" ] || continue
+              if grep -qE '^[[:space:]]*pull_request_target[[:space:]]*:' "$file"; then
+                echo "::error file=$file::pull_request_target is not permitted"
+                fail=1
+              fi
+              while IFS= read -r line; do
+                ref="${line##*@}"
+                ref="${ref%%[[:space:]]*}"
+                if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+                  echo "::error file=$file::action is not pinned to a full SHA: $line"
+                  fail=1
+                fi
+              done < <(grep -E '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*[^./][^[:space:]]*/[^[:space:]]+@' "$file" || true)
+            done
+          done
+          exit "$fail"
+
+  vuln-scan:
+    runs-on: ubuntu-26.04
+    container:
+      image: casjaysdev/go:latest
+      options: "--user 0:0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+      - run: govulncheck ./...
+        if: hashFiles('go.sum') != ''
 
   image-scan:
-    if: github.event_name != 'schedule'
-    needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Build image for scan
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Build image for scanning
+        if: hashFiles('docker/Dockerfile') != ''
         run: docker build -f docker/Dockerfile -t redxt:ci-scan .
       - name: Scan image
+        if: hashFiles('docker/Dockerfile') != ''
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.70.0 image \
+            aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e image \
             --exit-code 1 --severity CRITICAL,HIGH redxt:ci-scan

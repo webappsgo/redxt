@@ -13,73 +13,97 @@ on:
 
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
 
 env:
-  PROJECT_NAME: redxt
   REGISTRY: ghcr.io
 
 jobs:
   build-standard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name != 'schedule'
     permissions:
       contents: read
       packages: write
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
       - name: Log in to Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set build info
+        id: metadata
         run: |
           # ghcr.io requires a lowercase image path
-          echo "IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
-          echo "YYMM=$(date +"%y%m")" >> $GITHUB_ENV
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> "$GITHUB_ENV"
+          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+          PROJECT_NAME="${{ github.event.repository.name }}"
+          echo "PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
+          echo "project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+          COMMIT_ID=$(git rev-parse --short=7 HEAD)
+          echo "COMMIT_ID=$COMMIT_ID" >> "$GITHUB_ENV"
+          echo "commit_id=$COMMIT_ID" >> "$GITHUB_OUTPUT"
+          YYMM=$(date +"%y%m")
+          echo "YYMM=$YYMM" >> "$GITHUB_ENV"
+          echo "yymm=$YYMM" >> "$GITHUB_OUTPUT"
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
-            echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
-            echo "IS_TAG=true" >> $GITHUB_ENV
+            VERSION="${VERSION#v}"
+            IS_TAG=true
+            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+            echo "IS_TAG=$IS_TAG" >> "$GITHUB_ENV"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "is_tag=$IS_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "VERSION=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
-            echo "IS_TAG=false" >> $GITHUB_ENV
+            VERSION="$COMMIT_ID"
+            IS_TAG=false
+            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+            echo "IS_TAG=$IS_TAG" >> "$GITHUB_ENV"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "is_tag=$IS_TAG" >> "$GITHUB_OUTPUT"
           fi
           BUILD_EPOCH=$(date -u +%s)
-          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$BUILD_DATE" >> "$GITHUB_ENV"
+          echo "build_epoch=$BUILD_EPOCH" >> "$GITHUB_OUTPUT"
+          echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
 
       - name: Determine tags (standard)
         id: tags
         run: |
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.COMMIT_ID }}"
+          TAGS="${{ env.REGISTRY }}/${IMAGE_NAME}:${COMMIT_ID}"
 
-          if [[ "${{ env.IS_TAG }}" == "true" ]]; then
-            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
-            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.YYMM }}"
+          if [[ "${IS_TAG}" == "true" ]]; then
+            TAGS="$TAGS,${{ env.REGISTRY }}/${IMAGE_NAME}:${VERSION}"
+            TAGS="$TAGS,${{ env.REGISTRY }}/${IMAGE_NAME}:latest"
+            TAGS="$TAGS,${{ env.REGISTRY }}/${IMAGE_NAME}:${YYMM}"
           else
+            TAGS="$TAGS,${{ env.REGISTRY }}/${IMAGE_NAME}:devel"
             if [[ "${{ github.ref }}" == refs/heads/beta ]]; then
-              TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta"
+              TAGS="$TAGS,${{ env.REGISTRY }}/${IMAGE_NAME}:beta"
             fi
           fi
 
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build and push (standard)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -88,105 +112,118 @@ jobs:
           provenance: false
           tags: ${{ steps.tags.outputs.tags }}
           build-args: |
-            VERSION=${{ env.VERSION }}
-            BUILD_DATE=${{ env.BUILD_DATE }}
-            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
-            COMMIT_ID=${{ env.COMMIT_ID }}
+            VERSION=${{ steps.metadata.outputs.version }}
+            BUILD_DATE=${{ steps.metadata.outputs.build_date }}
+            BUILD_EPOCH=${{ steps.metadata.outputs.build_epoch }}
+            COMMIT_ID=${{ steps.metadata.outputs.commit_id }}
           labels: |
-            org.opencontainers.image.vendor=webappsgo
-            org.opencontainers.image.authors=webappsgo
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.authors=${{ github.repository_owner }}
+            org.opencontainers.image.title=${{ steps.metadata.outputs.project_name }}
+            org.opencontainers.image.base.name=${{ steps.metadata.outputs.project_name }}
+            org.opencontainers.image.description=${{ steps.metadata.outputs.project_name }} - standard image (alpine)
+            org.opencontainers.image.version=${{ steps.metadata.outputs.version }}
+            org.opencontainers.image.created=${{ steps.metadata.outputs.build_date }}
+            org.opencontainers.image.revision=${{ steps.metadata.outputs.commit_id }}
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
           annotations: |
-            manifest:org.opencontainers.image.vendor=webappsgo
-            manifest:org.opencontainers.image.authors=webappsgo
-            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
-            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
-            manifest:org.opencontainers.image.version=${{ env.VERSION }}
-            manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            manifest:org.opencontainers.image.vendor=${{ github.repository_owner }}
+            manifest:org.opencontainers.image.authors=${{ github.repository_owner }}
+            manifest:org.opencontainers.image.title=${{ steps.metadata.outputs.project_name }}
+            manifest:org.opencontainers.image.base.name=${{ steps.metadata.outputs.project_name }}
+            manifest:org.opencontainers.image.description=${{ steps.metadata.outputs.project_name }} - standard image (alpine)
+            manifest:org.opencontainers.image.version=${{ steps.metadata.outputs.version }}
+            manifest:org.opencontainers.image.created=${{ steps.metadata.outputs.build_date }}
+            manifest:org.opencontainers.image.revision=${{ steps.metadata.outputs.commit_id }}
             manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    if: github.event_name == 'schedule' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')) || (github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/'))
     permissions:
       contents: read
       packages: write
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
       - name: Log in to Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set build info
+        id: metadata
         run: |
           # ghcr.io requires a lowercase image path
           echo "IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+          PROJECT_NAME="${{ github.event.repository.name }}"
+          echo "PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
+          echo "project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+          COMMIT_ID=$(git rev-parse --short=7 HEAD)
+          echo "COMMIT_ID=$COMMIT_ID" >> "$GITHUB_ENV"
+          echo "commit_id=$COMMIT_ID" >> "$GITHUB_OUTPUT"
           BUILD_EPOCH=$(date -u +%s)
-          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$BUILD_DATE" >> "$GITHUB_ENV"
+          echo "build_epoch=$BUILD_EPOCH" >> "$GITHUB_OUTPUT"
+          echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Determine devel image tag
+        id: tags
+        run: echo "tags=${{ env.REGISTRY }}/${{ steps.metadata.outputs.image_name }}:devel" >> "$GITHUB_OUTPUT"
 
       - name: Build and push (devel)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           file: docker/Dockerfile.dev
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
+          tags: ${{ steps.tags.outputs.tags }}
           build-args: |
             VERSION=devel
-            BUILD_DATE=${{ env.BUILD_DATE }}
-            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
-            COMMIT_ID=${{ env.COMMIT_ID }}
+            BUILD_DATE=${{ steps.metadata.outputs.build_date }}
+            BUILD_EPOCH=${{ steps.metadata.outputs.build_epoch }}
+            COMMIT_ID=${{ steps.metadata.outputs.commit_id }}
           labels: |
-            org.opencontainers.image.vendor=webappsgo
-            org.opencontainers.image.authors=webappsgo
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.authors=${{ github.repository_owner }}
+            org.opencontainers.image.title=${{ steps.metadata.outputs.project_name }}-devel
+            org.opencontainers.image.base.name=${{ steps.metadata.outputs.project_name }}
+            org.opencontainers.image.description=${{ steps.metadata.outputs.project_name }} - development image (alpine, debug mode)
             org.opencontainers.image.version=devel
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            org.opencontainers.image.created=${{ steps.metadata.outputs.build_date }}
+            org.opencontainers.image.revision=${{ steps.metadata.outputs.commit_id }}
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
           annotations: |
-            manifest:org.opencontainers.image.vendor=webappsgo
-            manifest:org.opencontainers.image.authors=webappsgo
-            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
-            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            manifest:org.opencontainers.image.vendor=${{ github.repository_owner }}
+            manifest:org.opencontainers.image.authors=${{ github.repository_owner }}
+            manifest:org.opencontainers.image.title=${{ steps.metadata.outputs.project_name }}-devel
+            manifest:org.opencontainers.image.base.name=${{ steps.metadata.outputs.project_name }}
+            manifest:org.opencontainers.image.description=${{ steps.metadata.outputs.project_name }} - development image (alpine, debug mode)
             manifest:org.opencontainers.image.version=devel
-            manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            manifest:org.opencontainers.image.created=${{ steps.metadata.outputs.build_date }}
+            manifest:org.opencontainers.image.revision=${{ steps.metadata.outputs.commit_id }}
             manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}

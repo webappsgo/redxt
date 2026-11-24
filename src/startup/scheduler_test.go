@@ -11,35 +11,41 @@ import (
 
 func noopHandler(context.Context) error { return nil }
 
-// The ssl_renewal task must reach the scheduler with PART 19's daily
-// 03:00 schedule and as a global (cluster-locked) task, so a cluster
-// never has several nodes renewing the same certificate at once.
-func TestRegisterTaskWiresSSLRenewal(t *testing.T) {
-	sched := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil)
-	tasks := config.DefaultConfig().Server.Scheduler.Tasks
-
-	if err := registerTask(sched, tasks, "ssl_renewal", noopHandler); err != nil {
-		t.Fatalf("registerTask: %v", err)
+// Built-in task registration must use PART 19's global/local classification
+// so global tasks acquire a cluster lock and local tasks run on every node.
+func TestConfiguredTaskUsesGlobalTaskClassification(t *testing.T) {
+	defaults := config.DefaultConfig().Server.Scheduler.Tasks
+	globalTasks := []string{
+		"ssl_renewal", "geoip_update", "blocklist_update",
+		"cve_update", "backup_daily", "update_check",
+	}
+	for _, name := range globalTasks {
+		task := configuredTask(name, defaults[name], noopHandler)
+		if !task.ClusterAware {
+			t.Errorf("configuredTask(%q).ClusterAware = false, want true", name)
+		}
+		if err := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil).Register(task); err != nil {
+			t.Errorf("Register(%q): %v", name, err)
+		}
 	}
 
-	task, ok := sched.Registered("ssl_renewal")
-	if !ok {
-		t.Fatal("ssl_renewal was not registered")
+	localTasks := []string{
+		"session_cleanup", "token_cleanup", "log_rotation",
+		"healthcheck_self", "tor_health", "cluster_heartbeat",
 	}
-	if task.Schedule != "0 3 * * *" {
-		t.Errorf("schedule = %q, want %q", task.Schedule, "0 3 * * *")
-	}
-	if !task.Enabled {
-		t.Error("ssl_renewal must be enabled by default")
-	}
-	if !task.ClusterAware {
-		t.Error("ssl_renewal is a PART 19 global task and must be cluster-aware")
+	for _, name := range localTasks {
+		task := configuredTask(name, defaults[name], noopHandler)
+		if task.ClusterAware {
+			t.Errorf("configuredTask(%q).ClusterAware = true, want false", name)
+		}
+		if err := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil).Register(task); err != nil {
+			t.Errorf("Register(%q): %v", name, err)
+		}
 	}
 }
 
-// The daily 03:00 cron expression must actually resolve to 03:00 local
-// time, which is the concrete guarantee PART 15's renewal check relies
-// on rather than the literal string alone.
+// The daily 03:00 cron expression must resolve to 03:00 in the configured
+// timezone, which is the concrete guarantee PART 15's renewal check relies on.
 func TestSSLRenewalScheduleFiresAtThree(t *testing.T) {
 	tasks := config.DefaultConfig().Server.Scheduler.Tasks
 	parsed, err := scheduler.ParseSchedule(tasks["ssl_renewal"].Schedule)
@@ -57,44 +63,12 @@ func TestSSLRenewalScheduleFiresAtThree(t *testing.T) {
 	}
 }
 
-// A task the operator removed from the config table registers nothing
-// rather than falling back to a hardcoded schedule.
-func TestRegisterTaskSkipsUnconfiguredTask(t *testing.T) {
-	sched := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil)
-
-	if err := registerTask(sched, map[string]config.SchedulerTask{}, "ssl_renewal", noopHandler); err != nil {
-		t.Fatalf("registerTask: %v", err)
-	}
-	if _, ok := sched.Registered("ssl_renewal"); ok {
-		t.Fatal("an unconfigured task must not be registered")
-	}
-}
-
-// Node-local tasks must not take a cluster lock, or only one node in
-// the cluster would ever clean up its own sessions.
-func TestRegisterTaskLeavesLocalTasksNodeLocal(t *testing.T) {
-	sched := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil)
-	tasks := config.DefaultConfig().Server.Scheduler.Tasks
-
-	if err := registerTask(sched, tasks, "session_cleanup", noopHandler); err != nil {
-		t.Fatalf("registerTask: %v", err)
-	}
-	task, ok := sched.Registered("session_cleanup")
-	if !ok {
-		t.Fatal("session_cleanup was not registered")
-	}
-	if task.ClusterAware {
-		t.Error("session_cleanup is a PART 19 local task and must run on every node")
-	}
-}
-
-func TestRegisterTaskRejectsInvalidSchedule(t *testing.T) {
-	sched := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil)
-	tasks := map[string]config.SchedulerTask{
-		"ssl_renewal": {Schedule: "not a cron expression", Enabled: true},
-	}
-
-	if err := registerTask(sched, tasks, "ssl_renewal", noopHandler); err == nil {
+func TestConfiguredTaskRejectsInvalidSchedule(t *testing.T) {
+	task := configuredTask("ssl_renewal", config.SchedulerTask{
+		Schedule: "not a cron expression",
+		Enabled:  true,
+	}, noopHandler)
+	if err := scheduler.New(nil, "node-a", time.UTC, time.Hour, nil, nil).Register(task); err == nil {
 		t.Fatal("expected an invalid schedule to be rejected")
 	}
 }

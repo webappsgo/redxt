@@ -54,7 +54,7 @@ func QueryContext(ctx context.Context, db *DB, timeout time.Duration, query stri
 		timeout = TimeoutSimple
 	}
 	ctx, cancel := withTimeout(ctx, timeout)
-	rows, err := db.DB.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		cancel()
 		return nil, func() {}, err
@@ -77,7 +77,7 @@ func QueryRowContext(ctx context.Context, db *DB, timeout time.Duration, scan fu
 	}
 	ctx, cancel := withTimeout(ctx, timeout)
 	defer cancel()
-	return scan(db.DB.QueryRowContext(ctx, query, args...))
+	return scan(db.QueryRowContext(ctx, query, args...))
 }
 
 // ExecContext runs a statement under the supplied timeout, defaulting to the
@@ -90,7 +90,7 @@ func ExecContext(ctx context.Context, db *DB, timeout time.Duration, query strin
 	}
 	ctx, cancel := withTimeout(ctx, timeout)
 	defer cancel()
-	return db.DB.ExecContext(ctx, query, args...)
+	return db.ExecContext(ctx, query, args...)
 }
 
 // withTimeout applies timeout to ctx unless ctx already has a deadline, in

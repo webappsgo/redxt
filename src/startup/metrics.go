@@ -23,10 +23,10 @@ func (s *Server) startMetrics() {
 	}, s.Started)
 
 	s.Metrics.RegisterDBStatsSource("server", func() sql.DBStats {
-		return s.ServerDB.DB.Stats()
+		return s.ServerDB.Stats()
 	})
 	s.Metrics.RegisterDBStatsSource("users", func() sql.DBStats {
-		return s.UsersDB.DB.Stats()
+		return s.UsersDB.Stats()
 	})
 
 	loki := s.Config.Server.Metrics.Loki

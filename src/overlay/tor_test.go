@@ -3,7 +3,6 @@ package overlay
 import (
 	"context"
 	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -431,7 +430,7 @@ func TestTorManagerMonitorRestartsUnhealthyProcess(t *testing.T) {
 
 func TestTorServiceDirectClientTypeIsHTTPClient(t *testing.T) {
 	var svc TorService
-	var c *http.Client = svc.GetHTTPClient(true)
+	c := svc.GetHTTPClient(true)
 	if c == nil {
 		t.Fatal("expected a non-nil client even with no dialer configured")
 	}

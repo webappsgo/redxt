@@ -217,7 +217,7 @@ func TestFormatTimeSortsLexically(t *testing.T) {
 	for _, step := range []time.Duration{time.Second, time.Minute, time.Hour, 24 * time.Hour, 40 * 24 * time.Hour} {
 		base = base.Add(step)
 		next := FormatTime(base)
-		if !(prev < next) {
+		if prev >= next {
 			t.Errorf("%q is not lexically before %q", prev, next)
 		}
 		prev = next

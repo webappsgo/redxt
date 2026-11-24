@@ -1,57 +1,102 @@
 # redxt
 
-**redxt** is a fully RFC-compliant DNS platform that replaces
-BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home, acme-dns, and
-hosted services like DuckDNS, No-IP, DynDNS, FreeDNS, and redirect.center
-with one self-hosted application. Its server handles authoritative DNS,
-recursive resolution, forwarding, DNS firewall, hosted dynamic DNS, HTTP
-redirects, and DNS-distributed data in one process. Companion CLI and
-data-plane agent binaries provide operator access and distributed DNS
-service.
+[![CI](https://github.com/webappsgo/redxt/actions/workflows/ci.yml/badge.svg)](https://github.com/webappsgo/redxt/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/webappsgo/redxt)](LICENSE.md)
 
-One server process for every DNS role, with no required external service dependency.
+## About
 
-The official site and flagship public instance run at
-[redxt.us](https://redxt.us).
+redxt is an in-development DNS platform. The current server provides
+authoritative answers for configured primary and secondary zones over DNS
+UDP/TCP and DNS-over-HTTPS. The broader product specification includes
+recursive resolution, forwarding, DNS firewall, dynamic DNS, redirects,
+data zones, clustering, and managed agents; those capabilities are not yet
+complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
+[`IDEA.md`](IDEA.md) for the product requirements.
 
-## Status
+## Official Site
 
-This project is in active bootstrap/development. See `TODO.AI.md`
-for the current implementation backlog and `IDEA.md` for the full
-business-logic specification.
+[redxt.us](https://redxt.us)
 
-## Installation
+## Features
 
-Production builds are not yet published. Once released, single
-static binaries will be available for linux/darwin/windows/freebsd
-on amd64/arm64.
+- Authoritative DNS over UDP and TCP, with configurable listener address
+  and port
+- DNS-over-HTTPS at `/dns-query` on HTTPS, using RFC 8484 GET and POST
+- Server-rendered setup and administration pages
+- Health endpoints for monitoring the current server
+- Companion `redxt-cli` and `redxt-agent` binaries are part of the required
+  project deliverables; see the backlog for incomplete behavior
 
-## Configuration
+The project is not yet a replacement for a production DNS stack. Review the
+current feature status before deploying it.
 
-redxt is configured via `server.yml`, environment variables, and CLI
-flags. See [`docs/configuration.md`](docs/configuration.md) for the
-configuration reference.
+## Production
+
+Production-ready releases are not yet available. For development deployment
+instructions, see [`docs/installation.md`](docs/installation.md). The
+production Compose configuration is in `docker/docker-compose.yml`.
 
 ## Client
 
-`redxt-cli` is the companion CLI/TUI client, required for all
-`redxt` deployments. See `docs/cli.md`.
+The repository includes the `redxt-cli` companion client and `redxt-agent`.
+Their current commands and flags are documented in [`docs/cli.md`](docs/cli.md);
+the full operator and managed-node workflows remain in development.
+
+## Configuration
+
+redxt reads `server.yml`, environment variables, and CLI flags. See
+[`docs/configuration.md`](docs/configuration.md) for current settings.
+
+## API
+
+Current server endpoints include:
+
+- Health: `GET https://redxt.us/server/healthz`
+- Versioned health: `GET https://redxt.us/api/v1/server/healthz`
+- DNS-over-HTTPS: `GET` or `POST https://redxt.us/dns-query`
+
+These URLs represent the configured official hostname. The same paths are
+available on a self-hosted instance. See [`docs/api.md`](docs/api.md) for the
+implemented API surface.
+
+## Other
+
+- [Installation](docs/installation.md)
+- [API reference](docs/api.md)
+- [Security](docs/security.md)
+- [Integrations](docs/integrations.md)
+- [Implementation backlog](TODO.AI.md)
 
 ## Development
 
+Go builds and tests run in the project’s Docker toolchain. Common commands:
+
 ```bash
-make build   # all platforms, via casjaysdev/go:latest in Docker
-make test    # go vet + govulncheck + go test, via Docker
-make docker  # multi-arch image build (no push)
+make test
+make build
+make docker
 ```
 
-See `docs/development.md` for the full development guide.
+See [`docs/development.md`](docs/development.md) for the development workflow.
 
 ## Disclaimer
 
-redxt is provided "as is" without warranty of any kind. See
-`LICENSE.md`.
+This software is provided "as is" without warranty of any kind. Use it only
+after evaluating whether it is suitable for your environment.
+
+- **No Warranty**: The authors are not responsible for damages, data loss,
+  or other issues arising from use of this software.
+- **Not Professional Advice**: This software does not provide legal,
+  financial, medical, or other professional advice.
+- **Third-Party Services**: External services used with redxt are subject to
+  their own terms.
+- **Security**: No software can be guaranteed free of vulnerabilities.
+- **Production Use**: The project is under active development; evaluate it
+  thoroughly before production use.
+
+By using this software, you acknowledge that you have read and understood
+this disclaimer.
 
 ## License
 
-MIT — see `LICENSE.md`.
+MIT — see [`LICENSE.md`](LICENSE.md).

@@ -1,13 +1,10 @@
 # redxt
 
-**redxt** is a fully RFC-compliant DNS platform that replaces
-BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home, acme-dns, and
-hosted services like DuckDNS, No-IP, DynDNS, FreeDNS, and redirect.center
-with one self-hosted application. Its server handles authoritative DNS,
-recursive resolution, forwarding, DNS firewall, hosted dynamic DNS, HTTP
-redirects, and DNS-distributed data in one process. Companion CLI and
-data-plane agent binaries provide operator access and distributed DNS
-service.
+**redxt** is an in-development DNS platform. The current server provides
+authoritative answers for configured primary and secondary zones over DNS
+UDP/TCP and DNS-over-HTTPS. Recursive resolution, forwarding, DNS firewall,
+hosted dynamic DNS, HTTP redirects, DNS-distributed data, clustering, and
+managed-agent workflows are product requirements that remain in progress.
 
 One server process for every DNS role, with no required external service dependency.
 
@@ -15,7 +12,7 @@ One server process for every DNS role, with no required external service depende
 
 ```bash
 # Docker
-docker run --name "redxt-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -p 172.17.0.1:64580:80 ghcr.io/webappsgo/redxt:latest
+docker run --name "redxt-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -p 172.17.0.1:64580:80 -p 53:53/tcp -p 53:53/udp ghcr.io/webappsgo/redxt:latest
 
 # Binary
 ./redxt-linux-amd64 --config server.yml
@@ -26,17 +23,16 @@ On first run redxt selects a random port in the 64000-64999 range
 console, and serves the setup wizard until the Primary Admin account is
 created.
 
-## Features
+## Current Features
 
-- Authoritative primary/secondary, recursive resolver, forwarder, and
-  hybrid/split-horizon views in one process
-- DNS firewall/blocker with RPZ-style policies
-- Hosted dynamic-DNS provider and HTTP redirect engine
-- Data-zone publisher (DNS-distributed datasets)
-- Multi-user accounts, organizations, and custom domains
-- Cluster support for horizontal scaling across redxt instances
-- Built-in Let's Encrypt issuance, Tor hidden service, Prometheus
-  metrics, scheduler, GeoIP risk signals, backup/restore, self-update
+- Authoritative DNS over UDP and TCP
+- RFC 8484 DNS-over-HTTPS at `/dns-query` on HTTPS
+- Server-rendered setup and administration surfaces
+- Companion CLI and agent binaries with functionality still under
+  development
+
+See [`TODO.AI.md`](../TODO.AI.md) for the current implementation backlog and
+[`IDEA.md`](../IDEA.md) for the complete product requirements.
 
 ## Documentation
 

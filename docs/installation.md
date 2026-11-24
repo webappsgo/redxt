@@ -23,15 +23,17 @@ docker compose -f docker/docker-compose.yml up -d
 
 ## Binary
 
-Static binaries are published for all 8 target platforms
-(linux/darwin/windows/freebsd × amd64/arm64):
+Release binaries are not yet published. Release builds are intended to
+cover all 8 target platforms (linux/darwin/windows/freebsd × amd64/arm64).
+For local development builds, use the Docker-based workflow in
+[`development.md`](development.md).
 
 ```bash
 ./redxt-linux-amd64 --config server.yml
 ```
 
-No external runtime dependencies — a single binary is the full
-deployment artifact.
+The server binary is designed to run without external runtime
+dependencies once a release is available.
 
 ## Systemd Service
 

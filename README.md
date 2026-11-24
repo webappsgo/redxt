@@ -1,15 +1,15 @@
 # redxt
 
-**redxt** is a single-binary, fully RFC-compliant DNS platform that
-replaces BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home,
-acme-dns, and hosted services like DuckDNS, No-IP, DynDNS, FreeDNS,
-and redirect.center with one self-hosted application. It is
-authoritative server, recursive resolver, forwarder, DNS firewall,
-hosted dynamic-DNS provider, HTTP redirect engine, and
-DNS-distributed data index in a single process — clustered,
-encrypted, and observable by default.
+**redxt** is a fully RFC-compliant DNS platform that replaces
+BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home, acme-dns, and
+hosted services like DuckDNS, No-IP, DynDNS, FreeDNS, and redirect.center
+with one self-hosted application. Its server handles authoritative DNS,
+recursive resolution, forwarding, DNS firewall, hosted dynamic DNS, HTTP
+redirects, and DNS-distributed data in one process. Companion CLI and
+data-plane agent binaries provide operator access and distributed DNS
+service.
 
-One binary. Every DNS role. Zero external dependencies.
+One server process for every DNS role, with no required external service dependency.
 
 The official site and flagship public instance run at
 [redxt.us](https://redxt.us).
@@ -29,8 +29,8 @@ on amd64/arm64.
 ## Configuration
 
 redxt is configured via `server.yml`, environment variables, and CLI
-flags. See `docs/configuration.md` for the full reference once the
-docs site is built out.
+flags. See [`docs/configuration.md`](docs/configuration.md) for the
+configuration reference.
 
 ## Client
 

@@ -6,7 +6,7 @@ The admin panel is isolated under `/server/{admin_path}` — the path
 segment defaults to `administration` but is fully configurable in
 `server.yml`.
 
-On first run, redxt serves a setup wizard at `{admin_path}/config/setup`
+On first run, redxt serves a setup wizard at `/server/{admin_path}/setup`
 and prints a one-time setup token to the console/log. Completing the
 wizard creates the **Primary Admin** account, which cannot be deleted.
 

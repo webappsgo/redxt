@@ -1,13 +1,11 @@
 
-# redxt — The Complete DNS Server
-
 ## Project description
 
-**redxt** is a single-binary, fully RFC-compliant DNS platform that replaces BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home, acme-dns, and hosted services like DuckDNS, No-IP, DynDNS, FreeDNS, and redirect.center with one self-hosted application. It is authoritative server, recursive resolver, forwarder, DNS firewall, hosted dynamic-DNS provider, HTTP redirect engine, and DNS-distributed data index in a single process — clustered, encrypted, and observable by default. The former **cvedex** project is fully absorbed into redxt as the flagship dataset of its data-zones engine; cvedex no longer exists as a separate application.
+**redxt** is a fully RFC-compliant DNS platform that replaces BIND/named, Unbound, Pi-hole, Technitium, AdGuard Home, acme-dns, and hosted services like DuckDNS, No-IP, DynDNS, FreeDNS, and redirect.center with one self-hosted application. Its server provides authoritative DNS, recursive resolution, forwarding, DNS firewall, hosted dynamic DNS, HTTP redirects, and DNS-distributed data. Companion CLI and data-plane agent binaries provide operator access and distributed DNS service. The former **cvedex** project is fully absorbed into redxt as the flagship dataset of its data-zones engine; cvedex no longer exists as a separate application.
 
 It targets self-hosters, SMBs, and enterprises who want one DNS daemon for everything, deployable by users with low assumed technical knowledge, with sane defaults and full customizability. ISC BIND formats (named.conf, master zone files) are the canonical interchange standard: a working named deployment migrates with zero hand-editing.
 
-One binary. Every DNS role. Zero external dependencies.
+All DNS roles are available without requiring an external DNS service.
 
 **Reference deployment**: the official site and flagship public instance run at **redxt.us** (serving `redxt.us` and `*.redxt.us`); **ns1.redxt.us** and **ns2.redxt.us** are cluster nodes. The public DDNS provider, redirect engine, and data zones (including cvedex) operate under this domain.
 
@@ -32,18 +30,35 @@ maintainer_email: git-admin@casjaysdev.pro
 
 ### Product scope & non-goals
 
-**Scope: DNS only.** Every DNS role in one concurrent process — authoritative (primary/secondary), recursive resolver, forwarder, hybrid/split-horizon with views, DNS firewall/blocker, hosted dynamic-DNS provider, HTTP redirect engine, RDAP/WHOIS responder, and data-zone publisher — plus the clustering, agents, security, and management surfaces those roles need. A Terraform provider is a first-class deliverable from v1.
+**Scope: DNS only.** The product provides authoritative DNS (primary/secondary), recursive resolution, forwarding, hybrid/split-horizon views, DNS firewall/blocking, hosted dynamic DNS, HTTP redirects, RDAP/WHOIS, and published data zones, plus the clustering, agents, security, and management features those roles need. A Terraform provider is a first-class deliverable from v1.
+
+DNS protocol behavior must comply with all relevant RFCs. The supported protocol scope includes:
+
+| Area | RFCs |
+|---|---|
+| Core protocol | 1034, 1035, 2181, 2308, 2317, 3597, 6891 (EDNS0), 7766 (TCP), 7873 (Cookies), 8020, 8482 (ANY), 8914 (Extended Errors) |
+| Transfers & sync | 1995 (IXFR), 1996 (NOTIFY), 5936 (AXFR), 8945 (TSIG), 3645 (GSS-TSIG), 9103 (XoT), 9432 (catalog zones), 8976 (ZONEMD) |
+| Dynamic update | 2136, 2845 (TSIG auth for updates), 3007 |
+| DNSSEC | 4033–4035, 5155, 6605, 6840, 8080, 8198, 8624, 7344, 8078, 8901, 9276 |
+| Encrypted transports | 7858 (DoT), 8484 (DoH), 9250 (DoQ); DNSCrypt (non-RFC, v2 protocol) |
+| Service binding & discovery | 9460 (SVCB/HTTPS), 9461, 9462 (DDR), 9463 (DNR-ready) |
+| Resolver behavior | 9156 (QNAME minimization), 6147 (DNS64), 8806 (hyperlocal root), 8767 (serve-stale), 7871 (ECS) |
+| Privacy | 7830/8467 (padding), 9076 |
+| Special-use | 6761, 7686 (.onion) |
+| RDAP | 7480, 7481, 9082, 9083 |
+
+BIND-style Response Rate Limiting (RRL) and per-client/per-zone throttles are also in scope.
 
 **Non-goals (explicit):**
 
-- **Not a DHCP server** — a separate future casapps Go DHCP project integrates through documented hooks (see Trust boundaries).
+- **Not a DHCP server** — a separate future casapps DHCP project integrates through documented hooks (see Trust boundaries).
 - **Not an mDNS/LLMNR reflector** — local discovery is out of scope.
-- **Not an NTP server, registrar, CDN, reverse proxy, mail server, or packet firewall** — redxt hosts the records (MX, SPF, DKIM, DMARC, TLSA, CAA) and filters DNS answers, nothing else. HTTP serving is limited to the surfaces defined in "HTTP surface map".
+- **Not an NTP server, registrar, CDN, reverse proxy, mail server, or packet firewall** — redxt hosts the records (MX, SPF, DKIM, DMARC, TLSA, CAA) and filters DNS answers, nothing else. HTTP serving is limited to the public service hosts listed below.
 - **Not a downstream DNS load balancer (dnsdist)** — balancing across upstreams is the forwarder policy engine; balancing across redxt instances is clustering/agents; fronting third-party DNS pools is explicitly rejected. The supported pattern for legacy servers is migration (AXFR them in, retire them).
 - **No plugin/app runtime** — extensibility is built in: data zones, RPZ, REST API, webhooks, multi-channel notifications.
 - **No org change-approval workflow** — versioning, audit trail, and role separation cover shared-org safety.
 - **No AI/ML** — rule-based logic only (including the tunneling-detection rules).
-- **No telemetry, no cloud dependency, no monetization, no feature tiers** — every feature for every deployment size.
+- **No outbound telemetry, no cloud dependency, no monetization, no feature tiers** — every feature for every deployment size.
 - **Not a byte-for-byte redirect.center/txtdirect clone** — redxt's redirect engine (see "Server roles") is a from-scratch, RFC-compliant design that natively supports both projects' DNS record schemes (CNAME-encoded and TXT-directive, researched from their public source); txtdirect's `proxy` record type (real reverse-proxying) is excluded per the reverse-proxy non-goal above.
 
 ### Roles & permissions
@@ -67,7 +82,7 @@ Every zone, policy, key, and DDNS host belongs to an organization; every user ge
 | **DDNS host token** | Belongs to a user within an org; updates only its own host(s) |
 | **Agent token** (`adm_agt_`/`usr_agt_`/`org_agt_` per spec) | Data-plane enrollment only; no management authority |
 
-Instance admin, cluster nodes, and anonymous resolver clients behave per spec PARTs 17/10 and the ACL/rate-limit rules below.
+Instance admins, cluster nodes, and anonymous resolver clients have the distinct permissions and access boundaries described below and in AI.md PARTs 17 and 10.
 
 ### Data model & sensitivity
 
@@ -75,14 +90,12 @@ Instance admin, cluster nodes, and anonymous resolver clients behave per spec PA
 |---|---|---|
 | DNSSEC private keys (KSK/ZSK/CSK) | **Critical** | Encrypted at rest; exportable only by org owners/instance admin; included only in encrypted backups |
 | TSIG secrets, API/DDNS/agent tokens, GSS-TSIG material | **Critical** | Hashed where verification-only suffices, encrypted where the secret is needed; revocable; never logged |
-| User credentials / MFA secrets | **Critical** | Per spec (Argon2id, encrypted TOTP) |
+| User credentials / MFA secrets | **Critical** | Passwords are one-way protected; MFA secrets are encrypted at rest. |
 | Query logs | **High (PII)** | Client IP + names reveal behavior; retention policies, IP-truncation anonymization, purge on demand; org members see analytics only for their org's zones; instance-wide logs are instance-admin only |
 | Git sync credentials (deploy keys/tokens) | **High** | Encrypted at rest; push-only scope recommended in docs |
 | Zone data & records | Medium | Public by DNS nature; enumeration still resisted (NSEC3, ACL'd transfers) |
 | Config, ACLs, policies, templates, blocklist subscriptions | Medium | Versioned with diff/rollback; append-only changelog |
 | Metrics | Low | Aggregated; no per-client identifiers in Prometheus output by default |
-
-Storage per spec PART 10: SQLite default, optional PostgreSQL/MariaDB, idempotent self-creating schema, database-driven configuration, no config files.
 
 ### Trust boundaries & external services
 
@@ -97,17 +110,17 @@ All external dependencies are optional, fail safe, and have stated trust assumpt
 | Tor daemon / network | Transport for `.onion`/`.exit` only (RFC 7686); DNSSEC validation auto-excepted for these zones | Tor down → NXDOMAIN/SERVFAIL for onion only |
 | Outbound proxy (SOCKS5/HTTP; Tor is a special case) | Transport only; admin-configured | Proxy down → per-policy: fail closed (privacy) or fall back direct (availability), admin's choice |
 | ACME CA | Cert issuance only | Renewal failure → notify + self-signed fallback; never blocks DNS |
-| Git remotes (zone sync via embedded pure-Go git — **no git binary dependency ever**) | Push-only escrow target; remote treated as untrusted storage | Push failure → retry + notify; local history remains authoritative |
+| Git remotes (zone synchronization) | Push-only escrow target; remote treated as untrusted storage | Push failure → retry + notify; local history remains authoritative |
 | RDAP registries (domain-expiry monitoring) | Informational only | Lookup failure → monitoring gap notification, no serving impact |
 | S3-compatible backup targets | Untrusted storage; client-side encryption before upload | Backup failure → notify; serving unaffected |
 | Webhooks/notification channels | Receive-only sinks | Retry with backoff, then log |
 | Future casapps DHCP server | Authenticated peer via RFC 2136+TSIG and/or lease-event API with scoped token; leases become A/AAAA/PTR with expiry cleanup | DHCP down → records age out per policy |
 | AD/Kerberos infrastructure (GSS-TSIG) | Trusted only for the identities it asserts on update messages | KDC unreachable → GSS-TSIG updates fail closed; everything else unaffected |
 | GeoIP database (optional, local file) | Informational | Missing → geo features disabled |
-| Peer cluster nodes / agents | Per spec PART 10/33/34 join, secret distribution, and heartbeat rules | Per spec split-brain/majority rules; query serving continues |
+| Peer cluster nodes / agents | Authenticated members with scoped data access | Membership or quorum failures stop management writes; query serving continues where local data is available |
 | Terraform provider | A privileged API client; trusts redxt's API, authenticated by scoped org tokens | API errors surface as Terraform failures; no special server-side trust |
 
-Inbound DNS queries, DNS UPDATE messages, provider-API calls, encrypted-transport connections, and transfer requests are all **untrusted** and pass ACL, auth (TSIG/GSS-TSIG/token), validation, and rate limiting. The management plane trusts only authenticated sessions/tokens per spec.
+Inbound DNS queries, DNS UPDATE messages, provider-API calls, encrypted-transport connections, and transfer requests are all **untrusted** and are subject to authorization, validation, and rate limits. The management plane trusts only authenticated sessions and tokens.
 
 ### Threat model & abuse cases
 
@@ -145,20 +158,20 @@ Inbound DNS queries, DNS UPDATE messages, provider-API calls, encrypted-transpor
 4. **DNSCrypt supported** — legacy encrypted transport kept for dnscrypt-proxy ecosystems, as listener and upstream transport; DoT/DoH/DoQ remain the recommended path.
 5. **Operator may open recursion to `any`** — supported (intentional public resolvers) behind an explicit warning; RRL and throttles remain active.
 6. **Registration default is `invite`** — instance admin may open or close it per spec PART 34; compensating controls (quotas, reserved names, verification, abuse tooling) apply in all modes.
-7. **Agents are data-plane only** — no management listener; **agent DoH is off by default**, and when enabled it is a stripped listener serving only `/dns-query` (no routes, UI, or API).
+7. **Agents are data-plane only** — no management listener; **agent DoH is off by default**, and when enabled the listener handles DNS queries only (no management UI or API).
 8. **DNSSEC validation exceptions** — `onion`/`exit` auto-excepted (RFC 7686); admin-added negative trust anchors / validate-except entries are logged and visible.
 9. **Built-in ACME client makes outbound CA connections** — only for the server's own certificates; can be disabled in favor of supplied certs.
 10. **Admin-configured remote fetches** (feeds, data zones, GeoIP, git, backups) are core functionality, governed by the SSRF restrictions above.
 11. **Cluster writes require quorum** per spec — management-plane availability is sacrificed in minority partitions; query serving continues.
 12. **Query path is stateless per node** — no node-pinned query state, so cluster nodes and agents are anycast-safe by design.
 13. **DNSSEC is required, not optional** — every domain a user/org adds is signed by default (RFC 4033–4035); this is a stronger stance than "supported," reflecting that an RFC-noncompliant DNS response or an unauthenticated dynamic update is treated as a security bug, not a missing feature.
-14. **named.conf/zone files are a live, bidirectionally-synced exception to "database-driven config, no config files"** — the on-disk files are real, watched, writable config surfaces (not a one-shot import), because BIND-config-file parity is a stated primary use case; conflicting concurrent disk/DB edits are surfaced for review rather than silently resolved either direction.
+14. **BIND configuration and zone files are interoperability surfaces** — operators may import, export, and keep them synchronized with the server's managed state; conflicting edits from both surfaces are surfaced for review rather than silently overwritten. The project's primary server configuration follows AI.md.
 
 ---
 
 ### Server roles
 
-All roles run concurrently in one process; every zone and listener chooses its behavior independently.
+Each zone and listener can use its own role and policy settings.
 
 - **Authoritative** — primary/secondary hosting for any number of zones with full transfer, NOTIFY, and dynamic-update support.
 - **Recursive resolver** — full iterative resolution from root hints with DNSSEC validation, QNAME minimization, aggressive negative caching (RFC 8198), serve-stale (RFC 8767), **cache prefetch** of popular expiring entries, **DNS64** (RFC 6147), and **hyperlocal root** (RFC 8806) serving the root zone locally.
@@ -185,17 +198,17 @@ All roles run concurrently in one process; every zone and listener chooses its b
 - **Scheduled record changes**: queue changes for a maintenance window with optional auto-revert after a set duration.
 - **SOA serial policy** per zone: date-based `YYYYMMDDnn` (default), unixtime, or plain increment — always auto-managed.
 - **IDN**: Unicode names throughout UI/API, punycode on the wire.
-- **Zone versioning**: full history with diff and rollback; **git-backed zone sync** optionally commits/pushes rendered BIND-format zone files to a remote on every change, implemented with an embedded pure-Go git library — never requires a git binary on the host.
+- **Zone versioning**: full history with diff and rollback; **git-backed zone sync** optionally commits and pushes rendered BIND-format zone files to a remote on every change.
 
 ### ISC BIND compatibility & migration
 
 - **Zone files**: full RFC 1035 master-file syntax — `$ORIGIN`, `$TTL`, `$INCLUDE`, `$GENERATE`, multi-line parentheses, multi-string TXT, comments preserved on round-trip, wildcards, RFC 3597 generic syntax. Import and export.
-- **Root hints file** (`named.root`/`root.hints`, RFC 8109 priming): redxt bootstraps recursion from a local root-hints file exactly like BIND's `hints` zone type; it downloads the file from IANA on first run if missing, and refreshes it **monthly** on the scheduler (root server IP/name changes are rare — IANA's list has changed only a handful of times in the file's history — so monthly comfortably catches a renumbering without meaningful staleness risk; no external dependency at query time, a cached copy is never a startup blocker).
-- **named.conf — full support, not one-time-only**: keys, ACLs, options (notify/also-notify/notify-delay, allow-update, allow-update-forwarding, allow-transfer, allow-query, allow-recursion, forwarders, dnssec-validation, validate-except, transfer-format, max-cache-size, ...), logging categories, controls, and zone declarations — with a migration report for anything unmappable. redxt's own runtime config stays database-driven (per the "Standard casapps patterns" convention below), but named.conf/zone files are kept in **live bidirectional sync**, not treated as a one-shot import: an on-disk edit is detected (watch + reload, same mechanism as the git-backed zone sync) and merged into the DB; a DB-side change is rendered back out to the on-disk named.conf/zone files. Conflicting concurrent edits (disk vs. DB) are surfaced for review, never silently overwritten, following the existing zone-versioning diff/rollback model.
+- **Root hints** (RFC 8109 priming): recursive service starts with a usable root-hints set and refreshes it monthly. A failed refresh leaves the last usable set available.
+- **named.conf and zone files**: support BIND keys, ACLs, options, logging categories, controls, and zone declarations, with a migration report for anything unmappable. Operators may keep these files synchronized with managed settings and zone data; conflicting concurrent changes are shown for review instead of silently overwritten.
 - **One-command migration wizard**: point redxt at a live named server — it AXFRs every zone, parses named.conf, recreates keys/ACLs/policies, and produces the report. The same wizard handles the other importers.
 - **Other importers**: dnsmasq, Unbound local-zone/local-data, Pi-hole Teleporter, Technitium, PowerDNS, Knot/NSD, tinydns/djbdns, Windows DNS, hosted-provider BIND exports (Cloudflare, Route 53, ...). Exports: BIND master files, JSON, CSV.
-- **rndc protocol**: redxt implements BIND's actual `rndc` wire protocol (not just an equivalent), so the stock `rndc` binary and existing `rndc.conf`/keys work unmodified against redxt as a drop-in — reload, freeze/thaw, retransfer, notify, flush (global/per-domain), key management, statistics dump. The same operations are also exposed natively via `redxt-cli` and the API for non-BIND workflows. **Auto-generated on first run**: redxt generates its own rndc key and a ready-to-use `rndc.conf` (config dir, per AI.md PART 8) so `rndc` works immediately with zero manual setup, same as the rest of first-run zero-config; an operator migrating an existing BIND deployment can instead import their current `rndc.conf`/key so the existing `rndc` invocations keep working unchanged.
-- **Config/zone validation** (`named-checkconf`/`named-checkzone`-equivalent): the server binary's flag set is fixed per AI.md PART 8 ("THESE SERVER COMMANDS CANNOT BE CHANGED"), so this lives on the multi-command client instead — `redxt-cli check config` (validates the current named.conf-equivalent config, named-checkconf-style report and exit code), `redxt-cli check zone {zone}` (syntax, SOA/NS sanity, delegation, lame-delegation lint), `redxt-cli check root` (validates the cached root-hints file: freshness, syntax, priming-response sanity) — same auth/exit-code conventions as the rest of `redxt-cli` per PART 33.
+- **rndc protocol**: existing `rndc` clients and configuration work with redxt for reload, freeze/thaw, retransfer, notify, flush, key management, and statistics. These operations are also available through redxt's management interface. Operators may import existing `rndc` credentials during migration.
+- **Configuration and zone validation**: users can validate BIND-style configuration, zone syntax and delegation, and root-hints data. Reports identify errors and return a failing status when validation fails.
 
 ### TSIG, GSS-TSIG & keys
 
@@ -208,7 +221,7 @@ All roles run concurrently in one process; every zone and listener chooses its b
 - **ISC-style (RFC 2136/3007)**: full DNS UPDATE with TSIG/GSS-TSIG auth, prerequisites, per-zone/per-key `update-policy` grants, and update forwarding from secondaries to the primary. Works out of the box with nsupdate, ISC dhcpd, Kea, and certbot `dns-rfc2136`.
 - **Provider mode (DuckDNS / No-IP / DynDNS / FreeDNS replacement)**:
   - **Self-service subdomains** under operator-designated parent zones, governed by the instance registration mode (invite default) plus per-user quotas and reserved names.
-  - **Update API compatibility**: DynDNS2, No-IP, DuckDNS (`/update?domains=&token=&ip=` with `txt=` and `clear=`), FreeDNS, and a native JSON endpoint — existing routers, ddclient, inadyn, and DuckDNS containers migrate by changing URL and token.
+  - **Update API compatibility**: DynDNS2, No-IP, DuckDNS, FreeDNS, and a native JSON endpoint — existing routers, ddclient, inadyn, and DuckDNS containers migrate by changing URL and token. The DuckDNS-compatible endpoint accepts domain, token, address, optional TXT, and clear parameters.
   - **Records**: A/AAAA with auto-detected client IP (dual v4+v6), TXT for ACME DNS-01 on dynamic hosts, optional MX/CNAME per host.
   - **Parking**: per-hostname customizable offline/parking page via the redirect engine.
   - **Lifecycle**: per-token scoping, update history, stale-host expiry with warnings, rotation/revocation.
@@ -251,27 +264,27 @@ All roles run concurrently in one process; every zone and listener chooses its b
 
 ### Clustering, agents & CLI
 
-Cluster mechanics (join flow, secret distribution, primary election, heartbeats, split-brain/majority, removal cleanup) follow AI.md **PARTs 10/33/34** exactly. redxt-specific behavior:
+Cluster nodes use authenticated membership, shared secrets, heartbeats, and primary election. A minority partition cannot accept management writes; DNS query service continues from each node's available data. redxt-specific behavior:
 
 - **Cluster nodes**: every node serves every zone authoritatively and runs the full HTTP surface; zone data rides the spec's sync. "Secondary" is not something users configure — ns1/ns2.redxt.us are simply cluster nodes.
-- **Scheduled tasks**: cluster-wide tasks (`ssl_renewal`, `geoip_update`, `blocklist_update`, `cve_update`, `backup_daily`, `update_check`) run on one node; node-local cleanup and health tasks run on every node.
-- **Agent** (`redxt-agent`): **pure DNS data plane** — serves synced zones authoritatively, recursion/forwarding, blocklists, and client-group policies over **Do53/DoT/DoQ**; **DoH supported but disabled by default** (stripped `/dns-query`-only listener when enabled); zero management listener. Enrolls with an agent token; configured entirely from the server admin UI (spec agent pages) with redxt-specific per-agent settings: zone scope (all or selected), assigned policies/blocklists, forwarder pair (inherit or override), listener toggles. Drop a binary, paste a token, instant secondary.
+- **Scheduled tasks**: certificate renewal, GeoIP and blocklist updates, cve updates, daily backups, and update checks run on one cluster node; cleanup and health checks run on every node.
+- **Agent** (`redxt-agent`): **pure DNS data plane** — serves synced zones authoritatively, recursion/forwarding, blocklists, and client-group policies over **Do53/DoT/DoQ**; **DoH supported but disabled by default** and, when enabled, the listener handles DNS queries only; zero management listener. Enrolls with an agent token; configured entirely from the server admin UI (spec agent pages) with redxt-specific per-agent settings: zone scope (all or selected), assigned policies/blocklists, forwarder pair (inherit or override), listener toggles. Drop a binary, paste a token, instant secondary.
 - **Standards interop**: AXFR/IXFR/NOTIFY (+TSIG, +XoT) and **catalog zones (RFC 9432)** so third-party servers can be secondaries of redxt and vice versa — zone transfer (primary and secondary roles) is in scope for v1, not deferred.
-- **CLI** (`redxt-cli`, required per PART 33): full management parity, rndc-equivalent ops, the diagnostics suite, token auth per spec priority chain.
+- **CLI** (`redxt-cli`): full management parity, rndc-equivalent operations, the diagnostics suite, and token authentication.
 - **Anycast-safe**: stateless query path on every node and agent.
 
-### HTTP surface map
+### Public service hosts
 
 Subdomains the built-in HTTP server answers on the instance domain (redxt.us reference):
 
 | Host | Serves |
 |---|---|
-| apex + `www` | Web UI, landing, login; spec path routes (`/api/{api_version}`, `/server/{admin_path}`); `/dns-query` DoH alias |
-| `dns` | Canonical encrypted-DNS hostname: DoH `/dns-query`; cert/SAN + DDR/SVCB target for DoT/DoQ |
+| apex + `www` | Web UI, landing, login, management API, and DNS-over-HTTPS service |
+| `dns` | Canonical encrypted-DNS hostname; certificate identity and DDR/SVCB target for DoT/DoQ |
 | `ddns` | Provider update APIs (DuckDNS/DynDNS2/No-IP/FreeDNS-compatible + native JSON) |
-| `cve` | cvedex surface: `cve.redxt.us/2024-12345` → 302 redirector, JSON gateway, full-text search |
+| `cve` | cvedex redirector, JSON gateway, and full-text search |
 | `data` | Generic data-zones gateway (cvedex is dataset #1; future datasets appear here) |
-| `rdap` | RDAP base URL (WHOIS stays on port 43; web WHOIS lookup is a UI tool) |
+| `rdap` | RDAP service; WHOIS stays on port 43 and web WHOIS lookup is a UI tool |
 | `whoami` | Diagnostics echo: client IP, transport, ECS, resolver path |
 | `ns1`/`ns2` | DNS-only hosts; HTTP redirects to apex |
 | `*` (wildcard) | Unclaimed → 404/landing; claimed DDNS hostnames are DNS records only (or their parking page if parked) |
@@ -280,7 +293,7 @@ Custom domains (PART 36) let orgs serve their DDNS signup, redirector, parking, 
 
 ### Reserved subdomains
 
-- **Hard-blocked (not admin-removable)**: every service subdomain in the HTTP surface map, all underscore-prefixed labels, `wpad`, `isatap`, `localhost`, and any hostname belonging to the instance itself.
+- **Hard-blocked (not admin-removable)**: every service subdomain in the public service host list, all underscore-prefixed labels, `wpad`, `isatap`, `localhost`, and any hostname belonging to the instance itself.
 - **Seeded defaults (admin-editable)**: mail/mx/smtp/imap/pop/webmail/email; ftp/ssh/vpn/wg/git; api/admin/root/auth/login/sso/oauth/id/account/accounts; billing/pay/secure/ssl; support/help/docs/blog/status/metrics; proxy/gateway/cdn/static/assets/files/backup; db/mysql/postgres/redis/registry/docker/jenkins/ci; test/dev/staging/demo/beta/internal/corp/portal/app/web/m; abuse/security/postmaster/hostmaster/webmaster/noreply; autoconfig/autodiscover; ntp/time/irc/xmpp/sip/stun/turn/ldap.
 
 ### RDAP & WHOIS
@@ -304,29 +317,97 @@ In both `redxt-cli` and the web UI: dig/doggo-inspired query tool, deliberately 
 - **Terraform provider — first-class deliverable from v1**: full resource coverage (zones, records, templates, keys, policies, DDNS hosts, agents' assignments) against the REST API with org-scoped tokens; the API is designed with the provider as a primary consumer.
 - **DHCP hook** for the future casapps DHCP server: RFC 2136+TSIG (identical to ISC dhcpd/Kea) plus a lease-event API; leases become A/AAAA/PTR with automatic expiry cleanup.
 - **Webhooks out**: zone/record changes, security events, policy hits.
-- **Git zone sync**: embedded pure-Go git, push-on-change, per-org remotes and credentials.
+- **Git zone sync**: push-on-change with per-org remotes and credentials.
 - **Backup/restore**: scheduled encrypted snapshots to local path or S3-compatible storage; one-command restore.
 - **GeoIP** (optional local database): geo-aware records and analytics; off by default.
 
-### RFC compliance
+### API routes
 
-redxt implements the DNS server role itself, so per AI.md's "RFC-Based Applications" rule it must be fully RFC-compliant, not merely compatible-enough. Which RFCs are implemented, and to what depth, must stay documented here as features land — do not silently narrow or widen RFC scope without updating this section.
+Native management routes use the versioned REST API. Organization routes require a session or token scoped to that organization; the service enforces the role permissions above. Responses contain the requested resource or a collection of resources, and errors use the shared API error format. DNS-over-HTTPS, RDAP, WHOIS, and compatibility routes retain their protocol-defined paths and authentication.
 
-| Area | RFCs |
-|---|---|
-| Core protocol | 1034, 1035, 2181, 2308, 2317, 3597, 6891 (EDNS0), 7766 (TCP), 7873 (Cookies), 8020, 8482 (ANY), 8914 (Extended Errors) |
-| Transfers & sync | 1995 (IXFR), 1996 (NOTIFY), 5936 (AXFR), 8945 (TSIG), 3645 (GSS-TSIG), 9103 (XoT), 9432 (catalog zones), 8976 (ZONEMD) |
-| Dynamic update | 2136, 2845 (TSIG auth for updates), 3007 |
-| DNSSEC | 4033–4035, 5155, 6605, 6840, 8080, 8198, 8624, 7344, 8078, 9276 |
-| Encrypted transports | 7858 (DoT), 8484 (DoH), 9250 (DoQ); DNSCrypt (non-RFC, v2 protocol) |
-| Service binding & discovery | 9460 (SVCB/HTTPS), 9461, 9462 (DDR), 9463 (DNR-ready) |
-| Resolver behavior | 9156 (QNAME minimization), 6147 (DNS64), 8806 (hyperlocal root), 8767 (serve-stale), 7871 (ECS) |
-| Privacy | 7830/8467 (padding), 9076 |
-| Special-use | 6761, 7686 (.onion) |
-| RDAP | 7480, 7481, 9082, 9083 |
-
-BIND-style Response Rate Limiting (RRL) and per-client/per-zone throttles included though RRL is not an RFC. RFC 8901 multi-signer is roadmap.
-
-### Standard casapps patterns (governed by AI.md)
-
-Static single Go binary set (`redxt`, `redxt-agent`, `redxt-cli`, AMD64+ARM64), zero external runtime dependencies (including git — embedded pure-Go implementation), SQLite default with optional PostgreSQL/MariaDB, database-driven config, sane defaults with full customizability, security-first without blocking usability, first-user setup wizard, Dracula default theme, white-label per spec, Jenkins CI/CD, targeting self-hosted/SMB/enterprise users with low assumed technical knowledge.
+| Method | Path | Authentication; purpose; request and response |
+|---|---|---|
+| GET | `/api/{api_version}/orgs/{slug}/zones` | Org member; list zones; no body, returns zone summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/zones` | Org Admin/Owner; create a zone; accepts zone name and role settings, returns the new zone. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org member; read a zone; returns zone details. |
+| PATCH | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org Admin/Owner; update zone settings; accepts changed fields, returns the updated zone. |
+| DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org Admin/Owner; delete a zone; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/export` | Org member; export a zone; accepts a BIND, JSON, or CSV format, returns a downloadable file. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/import` | Org Admin/Owner; import zone data; accepts a BIND master file or supported provider export, returns an import report and created or updated zone. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records` | Org member; list records in a zone; returns record summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records` | Org Editor/Admin/Owner; create a record; accepts record owner, type, TTL, and data, returns the record. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records/{record_id}` | Org member; read a record; returns record details. |
+| PATCH | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records/{record_id}` | Org Editor/Admin/Owner; update a record; accepts changed record fields, returns the record. |
+| DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records/{record_id}` | Org Admin/Owner; delete a record; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/history` | Org member; list zone versions; returns version identifiers and change summaries. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/history/{version_id}` | Org member; read a historical zone version; returns the version's zone data and diff. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/history/{version_id}/restore` | Org Admin/Owner; restore a zone version; returns the restored current zone. |
+| GET | `/api/{api_version}/orgs/{slug}/keys/tsig` | Org member with key-read scope; list TSIG keys; returns public key metadata, never secret material. |
+| POST | `/api/{api_version}/orgs/{slug}/keys/tsig` | Org Admin/Owner; create a TSIG key; accepts name, algorithm, and grants, returns key metadata and the secret once. |
+| GET | `/api/{api_version}/orgs/{slug}/keys/tsig/{key_id}` | Org member with key-read scope; read TSIG key metadata; returns grants and status, never secret material. |
+| PATCH | `/api/{api_version}/orgs/{slug}/keys/tsig/{key_id}` | Org Admin/Owner; change TSIG grants or lifecycle; returns updated key metadata. |
+| DELETE | `/api/{api_version}/orgs/{slug}/keys/tsig/{key_id}` | Org Admin/Owner; revoke a TSIG key; returns a revocation result. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec` | Org member; read DNSSEC status and public signing material; returns status and public DNSKEY/DS data. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/keys` | Org Admin/Owner; generate or rotate signing keys; accepts key role and algorithm, returns public key metadata. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/rollovers` | Org Admin/Owner; schedule a signing-key rollover; accepts rollover parameters, returns rollover status. |
+| GET | `/api/{api_version}/orgs/{slug}/policies` | Org member; list DNS policies; returns policy summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/policies` | Org Admin/Owner; create a DNS policy; accepts policy rules and scope, returns the policy. |
+| GET | `/api/{api_version}/orgs/{slug}/policies/{policy_id}` | Org member; read a DNS policy; returns policy details. |
+| PATCH | `/api/{api_version}/orgs/{slug}/policies/{policy_id}` | Org Admin/Owner; update a DNS policy; accepts changed fields, returns the policy. |
+| DELETE | `/api/{api_version}/orgs/{slug}/policies/{policy_id}` | Org Admin/Owner; delete a DNS policy; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/ddns/hosts` | Org member; list dynamic-DNS hosts; returns host metadata. |
+| POST | `/api/{api_version}/orgs/{slug}/ddns/hosts` | Org Editor/Admin/Owner; create a dynamic-DNS host; accepts hostname and record options, returns host metadata and its update credential once. |
+| GET | `/api/{api_version}/orgs/{slug}/ddns/hosts/{host_id}` | Org member; read host status and history; returns host metadata and update history. |
+| PATCH | `/api/{api_version}/orgs/{slug}/ddns/hosts/{host_id}` | Org Editor/Admin/Owner; change host settings; accepts changed fields, returns host metadata. |
+| DELETE | `/api/{api_version}/orgs/{slug}/ddns/hosts/{host_id}` | Org Admin/Owner; remove a dynamic-DNS host; returns a deletion result. |
+| POST | `/api/{api_version}/ddns/update` | Host update credential; update the caller's host addresses and optional TXT data; accepts hostname, addresses, TXT and clear options, returns update status. |
+| GET | `/update` on the `ddns` host | DuckDNS-compatible update credential; accepts `domains`, `token`, `ip`, optional `txt` and `clear`; returns DuckDNS-compatible status text. |
+| GET | `/nic/update` on the `ddns` host | DynDNS2/No-IP-compatible credentials; accepts hostname and address parameters; returns provider-compatible status text. |
+| GET | `/update.php` on the `ddns` host | FreeDNS-compatible update credential and hostname token; updates the assigned host and returns provider-compatible status text. |
+| POST | `/register` on the `ddns` host | ACME-DNS registration; accepts account registration data, returns account credentials and update hostname. |
+| POST | `/update` on the `ddns` host | ACME-DNS account credentials; accepts the ACME challenge TXT value, returns update status. |
+| GET | `/api/{api_version}/orgs/{slug}/data-zones` | Org member; list published datasets; returns dataset summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/data-zones` | Org Admin/Owner; publish a dataset; accepts dataset metadata and source settings, returns dataset metadata. |
+| GET | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}` | Org member; read dataset details and status; returns dataset metadata. |
+| PATCH | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}` | Org Admin/Owner; update dataset settings; accepts changed fields, returns dataset metadata. |
+| DELETE | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}` | Org Admin/Owner; unpublish a dataset; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/agents` | Org member; list assigned agents; returns agent status and scope. |
+| POST | `/api/{api_version}/orgs/{slug}/agents` | Org Admin/Owner; enroll or assign an agent; accepts enrollment and scope settings, returns agent metadata. |
+| GET | `/api/{api_version}/orgs/{slug}/agents/{agent_id}` | Org member; read agent status; returns assigned zones, policies, and health. |
+| PATCH | `/api/{api_version}/orgs/{slug}/agents/{agent_id}` | Org Admin/Owner; change agent assignments; accepts changed scope and policy assignments, returns agent metadata. |
+| DELETE | `/api/{api_version}/orgs/{slug}/agents/{agent_id}` | Org Admin/Owner; revoke agent enrollment; returns a revocation result. |
+| GET | `/api/{api_version}/orgs/{slug}/zone-templates` | Org member; list reusable zone templates; returns template summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/zone-templates` | Org Admin/Owner; create a reusable zone template; accepts template fields and records, returns the template. |
+| GET | `/api/{api_version}/orgs/{slug}/zone-templates/{template_id}` | Org member; read a template; returns template details. |
+| PATCH | `/api/{api_version}/orgs/{slug}/zone-templates/{template_id}` | Org Admin/Owner; update a template; accepts changed fields, returns the template. |
+| DELETE | `/api/{api_version}/orgs/{slug}/zone-templates/{template_id}` | Org Admin/Owner; delete a template; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/blocklists` | Org member; list blocklist feeds; returns feed status and policy scope. |
+| POST | `/api/{api_version}/orgs/{slug}/blocklists` | Org Admin/Owner; subscribe to a blocklist feed; accepts feed URL, format, and policy scope, returns feed status. |
+| GET | `/api/{api_version}/orgs/{slug}/blocklists/{list_id}` | Org member; read feed status and counts; returns feed metadata. |
+| PATCH | `/api/{api_version}/orgs/{slug}/blocklists/{list_id}` | Org Admin/Owner; update feed settings; accepts changed fields, returns feed metadata. |
+| DELETE | `/api/{api_version}/orgs/{slug}/blocklists/{list_id}` | Org Admin/Owner; unsubscribe from a feed; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/git-sync` | Org member; read zone synchronization status; returns remote and sync state without credentials. |
+| PATCH | `/api/{api_version}/orgs/{slug}/git-sync` | Org Admin/Owner; configure zone synchronization; accepts remote and credential settings, returns sync state without secrets. |
+| POST | `/api/{api_version}/orgs/{slug}/git-sync/push` | Org Admin/Owner; push zone changes; returns the resulting revision and sync status. |
+| GET | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}/records` | Org member; list dataset entries; accepts filters and paging, returns matching entries. |
+| POST | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}/records` | Org Editor/Admin/Owner; add a dataset entry; accepts entry data, returns the created entry. |
+| GET | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}/records/{record_id}` | Org member; read a dataset entry; returns entry details. |
+| PATCH | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}/records/{record_id}` | Org Editor/Admin/Owner; update a dataset entry; returns the updated entry. |
+| DELETE | `/api/{api_version}/orgs/{slug}/data-zones/{dataset_id}/records/{record_id}` | Org Admin/Owner; delete a dataset entry; returns a deletion result. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/keys` | Org member; list public DNSSEC key metadata; returns key roles and lifecycle status. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/keys/{key_id}/rotate` | Org Admin/Owner; rotate a signing key; returns public key metadata and rollover status. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/transfers` | Org member; inspect transfer status and history; returns transfer summaries. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/transfers/notify` | Org Admin/Owner; send a zone-change notification; returns notification status. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/query-log` | Org member; read query events for the zone; accepts filters and paging, returns org-scoped query summaries. |
+| GET | `/api/{api_version}/orgs/{slug}/analytics` | Org member; read zone analytics; accepts a time range, returns aggregated counts and latency data. |
+| GET | `/api/{api_version}/data/{dataset}/search` | Public; search a published dataset; accepts query and paging parameters, returns matching entries. |
+| GET | `/api/{api_version}/data/{dataset}/{key}` | Public; read a published dataset entry; returns the public representation. |
+| GET | `/search` on the cve host | Public; search the CVE dataset; accepts query and paging parameters, returns matching CVE summaries. |
+| GET | `/{cve_id}` on the cve host | Public; resolve a CVE identifier in a browser; redirects to the authoritative reference. |
+| GET | `/dns-query` on the apex or `dns` host | Public DNS query; accepts a DNS message using the DoH GET encoding, returns a DNS message. |
+| POST | `/dns-query` on the apex or `dns` host | Public DNS query; accepts a DNS message body, returns a DNS message. |
+| GET | `/{dataset}/{key}` on the data host | Public; read a published dataset entry; returns its public representation. |
+| GET | `/` on the `whoami` host | Public; report the request's client address and DNS transport diagnostics. |
+| GET | `/rdap/domain/{domain}` on the `rdap` host | Public; look up domain registration data; returns an RFC 9082 domain object. |
+| GET | `/rdap/nameserver/{nameserver}` on the `rdap` host | Public; look up nameserver data; returns an RFC 9082 nameserver object. |
+| GET | `/data/{dataset}/{key}` on the `data` host | Public; read a published data-zone item; returns the dataset's public representation. |

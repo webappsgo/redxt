@@ -20,17 +20,19 @@ credentials with TOTP are the only supported sign-in method today.
 
 - **Terraform provider** — required by `IDEA.md`, but not implemented or
   published yet.
-- **BIND interchange** — BIND `named.conf` and master-zone-file support is
-  a product requirement; import/export is not implemented yet.
+- **BIND interchange** — zone import accepts BIND master files, and zone
+  export is available in BIND master format, JSON, and CSV. `named.conf`
+  migration remains unimplemented.
 - **Cluster nodes** — horizontal clustering between redxt instances is a
   product requirement, but cluster membership and synchronization are not
   implemented yet. Managed nodes (external DNS/redirect targets) are a
   separate product concept and are not currently managed by the server.
 
-The current management API covers user, organization, and custom-domain
-operations. DNS zone/record control-plane APIs and provider-compatible DDNS
-routes are not available yet; see [API Reference](api.md) for the implemented
-surface.
+The current management API covers user, organization, custom-domain, and DNS
+zone/record operations, including ownership verification, BIND master-file
+import, and zone export. Provider-compatible DDNS routes and the other DNS
+control-plane surfaces remain unimplemented; see [API Reference](api.md) for
+available routes.
 
 ## Operator Notes
 

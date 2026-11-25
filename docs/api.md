@@ -2,10 +2,10 @@
 
 ## REST API
 
-All API routes are versioned under `/api/{api_version}/...` (default
-`v1`). Every response — REST, Swagger, and GraphQL — shares one unified
-response and error shape, and all three surfaces describe the same API
-and stay in sync.
+Management REST routes are versioned under `/api/{api_version}/...`
+(default `v1`). REST success and error responses use the shared API
+envelope. Swagger returns an OpenAPI document, and GraphQL uses its
+protocol-defined response format; both describe the same REST surface.
 
 ### Endpoints
 
@@ -89,6 +89,7 @@ currently empty.
 | GET, POST | `/api/{api_version}/orgs/{slug}/zones` | Organization member for GET; admin or owner for POST | List or create DNS zones. Creation returns a pending zone and a one-time `_verify.<zone>` TXT challenge. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization member | Read a DNS zone. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/export` | Organization member | Download the zone and records as BIND (default), JSON, or CSV. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/import` | Organization admin or owner | Import a BIND master file; returns a pending zone, one-time verification challenge, and record count. |
 | PATCH, DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization admin or owner | Update or delete a DNS zone. |
 | POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/verification` | Organization admin or owner | Verify the published TXT challenge and activate the zone. |
 | GET, POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records` | Organization member for GET; editor, admin, or owner for POST | List or create validated DNS records. |
@@ -113,6 +114,24 @@ remain available to authorized organization administrators. The recoverable
 challenge is encrypted at rest and cleared after verification. Record owners
 and RDATA are validated before storage, and every zone and record lookup is
 organization-scoped.
+
+Zone import accepts `application/json` with a zone name and a BIND
+master-file string, up to 10 MiB:
+
+```json
+{
+  "name": "example.test",
+  "master_file": "$ORIGIN example.test.\n$TTL 3600\n@ IN SOA ns1.example.test. hostmaster.example.test. 1 86400 7200 3600000 3600\n@ IN NS ns1.example.test.\nns1 IN A 192.0.2.53\n"
+}
+```
+
+The import requires one apex SOA, accepts only IN records within the named
+zone, and rejects `$INCLUDE`. The zone and all records are stored atomically
+and remain pending until the TXT ownership challenge is verified. The success
+envelope's `data` contains `zone`, `verification` (`name`, `type`, `value`),
+and `record_count`. The challenge value is returned once and encrypted at
+rest. Imported records are normalized to DNS presentation data; comments and
+source formatting are not retained.
 
 Content negotiation is honored on every route (`Accept:
 application/json`, `text/plain`, `text/html` where applicable).

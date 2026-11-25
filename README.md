@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/webappsgo/redxt/actions/workflows/ci.yml/badge.svg)](https://github.com/webappsgo/redxt/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/webappsgo/redxt)](LICENSE.md)
+[![Documentation Status](https://readthedocs.org/projects/webappsgo-redxt/badge/?version=latest)](https://webappsgo-redxt.readthedocs.io/en/latest/?badge=latest)
 
 ## About
 

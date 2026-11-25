@@ -328,6 +328,7 @@ Native management routes use the versioned REST API. Organization routes require
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org member; read a zone; returns zone details. |
 | PATCH | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org Admin/Owner; update zone settings; accepts changed fields, returns the updated zone. |
 | DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Org Admin/Owner; delete a zone; returns a deletion result. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/verification` | Org Admin/Owner; verify the one-time `_verify.<zone>` TXT ownership challenge and activate the zone. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/export` | Org member; export a zone; accepts a BIND, JSON, or CSV format, returns a downloadable file. |
 | POST | `/api/{api_version}/orgs/{slug}/zones/import` | Org Admin/Owner; import zone data; accepts a BIND master file or supported provider export, returns an import report and created or updated zone. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records` | Org member; list records in a zone; returns record summaries. |

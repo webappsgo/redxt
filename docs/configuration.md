@@ -39,7 +39,7 @@ to `server.yml`:
 | Variable | Effect |
 |---|---|
 | `DNS_PORT` | DNS UDP/TCP listener port; overrides `dns.port` at runtime |
-| `DATABASE_DRIVER` | Database driver: `sqlite`, `libsql`, `postgres`, `mysql`, `mssql`, `mongodb` |
+| `DATABASE_DRIVER` | Driver identifier: `sqlite`, `libsql`, `postgres`, `mysql`, `mssql`, or `mongodb`. SQLite is the only implemented driver; selecting another value fails at startup. |
 | `DATABASE_URL` | Full database connection string, overriding the config file |
 | `HOSTNAME` | Fallback hostname used by URL variable resolution when the OS hostname is unavailable |
 
@@ -55,6 +55,7 @@ overrides `server.notifications.email.smtp.*` in `server.yml`:
 | `SMTP_TLS` | Enable TLS; a non-boolean value is ignored with a warning |
 | `SMTP_FROM_NAME` | Display name on outgoing mail |
 | `SMTP_FROM_EMAIL` | Envelope and header From address |
+| `I2P_ENABLED` | Overrides `server.i2p.enabled` on every start |
 
 The built-in DNS listener uses UDP and TCP on port 53 by default. It follows
 `server.listen` unless `dns.address` names a dedicated interface. Set
@@ -65,6 +66,11 @@ HTTPS is available at `/dns-query` on the HTTPS listener (GET and POST using
 `application/dns-message`); requests must arrive over TLS or through a trusted
 proxy that reports HTTPS. Recursive resolution and other encrypted transports
 (DNS-over-TLS, DNS-over-QUIC, and DNSCrypt) are not available yet.
+
+Tor settings live under `server.tor`; the active onion address is runtime
+state and is never written to `server.yml`. The I2P eepsite settings live
+under `server.i2p`. Both overlays default to hidden from `/api/autodiscover`;
+set the respective `expose` setting to `true` to publish an active address.
 
 Mode and debug behavior:
 

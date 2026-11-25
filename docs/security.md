@@ -17,11 +17,21 @@
 
 - `GET /server/healthz` (and root alias `GET /healthz`) — unauthenticated
   health check, safe to expose to uptime monitors and load balancers
+- `GET /api/v1/server/healthz` and `GET /api/healthz` — public health
+  response for API clients and probes
+- `GET /api/autodiscover` — public server discovery document
+
+Health responses include a fixed Tor and I2P state/status contract and a
+Do53 listener check. Overlay status is one of `disabled`, `starting`,
+`healthy`, or `unavailable`; diagnostic errors and filesystem paths stay
+out of the public response.
 
 ## Security Reporting
 
 Report vulnerabilities to the maintainer email listed in `IDEA.md`
-(`git-admin@casjaysdev.pro`) rather than filing a public issue.
+(`git-admin@casjaysdev.pro`) rather than filing a public issue. The
+server-rendered security-reporting page and `/.well-known/security.txt` are
+not implemented yet; the email address is the available reporting channel.
 
 ## Transport Security
 
@@ -30,11 +40,12 @@ Report vulnerabilities to the maintainer email listed in `IDEA.md`
 - A Tor hidden service is auto-enabled whenever a Tor binary is
   detected on the host; the hidden service is app-scoped only and never
   performs relay, exit, or proxy functions
-- I2P eepsite support is optional and strictly opt-in via
-  `features.i2p.enabled` — it is never auto-enabled
+- I2P eepsite support is optional: it defaults off on bare metal and VMs,
+  and on in application containers. Set `server.i2p.enabled` or
+  `I2P_ENABLED` to override the resolved default
 
 ## Well-Known Namespace
 
-Standard `/.well-known/` discovery documents are part of the PART 32/34
-integration surface; consult `TODO.AI.md` for current implementation
-status before relying on a specific well-known path in production.
+No `/.well-known/` documents are currently mounted. Planned discovery and
+security-reporting endpoints are tracked in `TODO.AI.md`; do not rely on
+those paths until the corresponding routes are implemented.

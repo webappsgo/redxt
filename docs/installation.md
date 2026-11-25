@@ -2,24 +2,29 @@
 
 ## Docker (Recommended)
 
-```bash
-docker run -d \
-  --name "redxt-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')" \
-  -p 172.17.0.1:64580:80 \
-  -p 53:53/tcp \
-  -p 53:53/udp \
-  -v ./docker/volumes/config:/config \
-  -v ./docker/volumes/data:/data \
-  ghcr.io/webappsgo/redxt:latest
-```
-
-The production and development compose files are in `docker/`; the test
-compose file is reserved for automated tests. The development compose uses
-DNS port `5353` so it can coexist with a production resolver on the host.
+Compose files live in `docker/`, but Compose must run from an isolated
+deployment directory so its relative `volumes/` paths never create runtime
+data in the source checkout. Choose a durable deployment directory outside
+the repository for production:
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+# Replace this with a durable path outside the source checkout.
+DEPLOY_DIR="/path/to/redxt-deployment"
+mkdir -p "$DEPLOY_DIR/volumes/config" "$DEPLOY_DIR/volumes/data"
+cp "$PROJECT_ROOT/docker/docker-compose.yml" "$DEPLOY_DIR/docker-compose.yml"
+cd "$DEPLOY_DIR" && docker compose up -d
 ```
+
+The development Compose file uses DNS port `5353` so it can coexist with
+a production resolver. Copy `docker/docker-compose.dev.yml` to a separate
+isolated runtime directory before running it. `docker/docker-compose.test.yml`
+is reserved for automated tests. See AI.md PART 27 for the temporary-directory
+workflow used for local/test deployments. For a throwaway development run,
+copy the Compose file into a temporary directory under
+`${TMPDIR:-/tmp}/webappsgo/redxt-*`, create its `volumes/config` and
+`volumes/data` directories there, and run Compose from that directory. Stop
+the stack and remove only that generated temporary directory when finished.
 
 ## Binary
 
@@ -41,7 +46,8 @@ Running as a dedicated system user avoids permanent root. Escalation is
 required only once, to install the service and bind privileged ports:
 
 ```bash
-sudo ./redxt-linux-amd64 --service --install
+make local
+sudo ./binaries/redxt --service --install
 sudo systemctl start redxt
 sudo systemctl status redxt
 ```

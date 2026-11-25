@@ -139,7 +139,9 @@ application/json`, `text/plain`, `text/html` where applicable).
 ## DNS-over-HTTPS
 
 The native DoH endpoint is served at `/dns-query` over HTTPS and uses the
-same authoritative answer engine as the UDP/TCP DNS listener. A trusted
+same authoritative answer engine as the UDP/TCP DNS listener. Separate DoT
+and DoQ listeners use that engine when enabled and a usable TLS certificate
+is available. A trusted
 reverse proxy may terminate TLS and report the effective scheme through the
 trusted-proxy configuration.
 
@@ -150,8 +152,8 @@ trusted-proxy configuration.
 
 Successful DNS exchanges return `application/dns-message`; a DNS-level error
 such as REFUSED is carried in the DNS response rather than converted to an
-HTTP error. Recursive resolution and other encrypted transports are not
-implemented yet.
+HTTP error. Recursive resolution, DNSCrypt, and encrypted upstream transports
+are not implemented yet.
 
 ## Swagger UI
 

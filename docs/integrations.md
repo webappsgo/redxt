@@ -9,6 +9,8 @@ credentials with TOTP are the only supported sign-in method today.
 ## Discovery & Protocol Endpoints
 
 - REST: `/api/v1/...`
+- DNS-over-HTTPS: `/dns-query` over HTTPS; DNS-over-TLS and DNS-over-QUIC
+  use dedicated encrypted DNS listeners when a certificate is available.
 - Swagger UI: `/server/docs/swagger`, JSON at `/api/v1/server/swagger`
   (alias `/api/swagger`)
 - GraphiQL: `/server/docs/graphql`, endpoint at

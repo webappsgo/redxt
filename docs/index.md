@@ -2,12 +2,14 @@
 
 **redxt** is an in-development DNS platform. The current server provides
 authoritative answers for configured primary and secondary zones over DNS
-UDP/TCP and DNS-over-HTTPS. Recursive resolution, forwarding, DNS firewall,
+UDP/TCP and DNS-over-HTTPS, with optional DoT/DoQ listeners when a usable
+certificate is available. Recursive resolution, forwarding, DNS firewall,
 hosted dynamic DNS, HTTP redirects, DNS-distributed data, clustering, and
 managed-agent workflows are product requirements that remain in progress.
 
 The product is intended to consolidate DNS roles in one service; only the
-authoritative and DoH surfaces described above are currently implemented.
+authoritative, DoH, DoT, and DoQ surfaces described above are currently
+implemented.
 
 ## Quick Start
 
@@ -28,6 +30,8 @@ created.
 
 - Authoritative DNS over UDP and TCP
 - RFC 8484 DNS-over-HTTPS at `/dns-query` on HTTPS
+- DNS-over-TLS and DNS-over-QUIC on configured listeners when a certificate
+  is available
 - Server-rendered setup and administration surfaces
 - Companion CLI and agent binaries with functionality still under
   development

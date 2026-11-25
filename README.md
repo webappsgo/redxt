@@ -8,7 +8,8 @@
 
 redxt is an in-development DNS platform. The current server provides
 authoritative answers for configured primary and secondary zones over DNS
-UDP/TCP and DNS-over-HTTPS. The broader product specification includes
+UDP/TCP and DNS-over-HTTPS, with optional DoT/DoQ listeners when a usable
+certificate is available. The broader product specification includes
 recursive resolution, forwarding, DNS firewall, dynamic DNS, redirects,
 data zones, clustering, and managed agents; those capabilities are not yet
 complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
@@ -23,6 +24,8 @@ complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
 - Authoritative DNS over UDP and TCP, with configurable listener address
   and port
 - DNS-over-HTTPS at `/dns-query` on HTTPS, using RFC 8484 GET and POST
+- Configurable DNS-over-TLS and DNS-over-QUIC listeners using the shared
+  certificate manager
 - Server-rendered setup and administration pages
 - Health endpoints for monitoring the current server
 - Companion `redxt-cli` and `redxt-agent` binaries are part of the required
@@ -56,6 +59,8 @@ Current server endpoints include:
 - Versioned health: `GET https://redxt.us/api/v1/server/healthz`
 - DNS-over-HTTPS: `GET https://redxt.us/dns-query?dns={base64url-message}`
   or `POST https://redxt.us/dns-query` with `Content-Type: application/dns-message`
+- DNS-over-TLS and DNS-over-QUIC: dedicated listeners on configured DNS
+  addresses when a usable certificate is available
 
 These URLs represent the configured official hostname. The same paths are
 available on a self-hosted instance. See [`docs/api.md`](docs/api.md) for the

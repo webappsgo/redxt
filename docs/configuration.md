@@ -39,6 +39,8 @@ to `server.yml`:
 | Variable | Effect |
 |---|---|
 | `DNS_PORT` | DNS UDP/TCP listener port; overrides `dns.port` at runtime |
+| `DOT_PORT` | DNS-over-TLS listener port; overrides `dns.dot.port` at runtime |
+| `DOQ_PORT` | DNS-over-QUIC listener port; overrides `dns.doq.port` at runtime |
 | `DATABASE_DRIVER` | Driver identifier: `sqlite`, `libsql`, `postgres`, `mysql`, `mssql`, or `mongodb`. SQLite is the only implemented driver; selecting another value fails at startup. |
 | `DATABASE_URL` | Full database connection string, overriding the config file |
 | `HOSTNAME` | Fallback hostname used by URL variable resolution when the OS hostname is unavailable |
@@ -62,10 +64,18 @@ The built-in DNS listener uses UDP and TCP on port 53 by default. It follows
 `dns.enabled: false` to disable it or `dns.port` to override the standard
 port. `DNS_PORT` overrides `dns.port` at runtime and is never persisted.
 The current listeners serve verified primary and secondary zones. DNS-over-
-HTTPS is available at `/dns-query` on the HTTPS listener (GET and POST using
+TLS uses the shared certificate manager on port 853 by default when a usable
+certificate is configured. Set `dns.dot.address` to bind it to a dedicated
+interface, or leave it empty to inherit the DNS listener address. `DOT_PORT`
+overrides `dns.dot.port` at runtime and is never persisted. DNS-over-QUIC
+uses the shared certificate manager and a dedicated QUIC listener on port 853
+by default when a usable certificate is configured. Set `dns.doq.address` to
+bind it to a dedicated interface, or leave it empty to inherit the DNS
+listener address. `DOQ_PORT` overrides `dns.doq.port` at runtime and is never
+persisted. DNS-over-HTTPS is available at `/dns-query` on the HTTPS listener
+(GET and POST using
 `application/dns-message`); requests must arrive over TLS or through a trusted
-proxy that reports HTTPS. Recursive resolution and other encrypted transports
-(DNS-over-TLS, DNS-over-QUIC, and DNSCrypt) are not available yet.
+proxy that reports HTTPS. DNSCrypt is not available yet.
 
 Tor settings live under `server.tor`; the active onion address is runtime
 state and is never written to `server.yml`. The I2P eepsite settings live

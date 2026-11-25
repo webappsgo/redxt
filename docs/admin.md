@@ -18,8 +18,12 @@ authenticates and starts a session).
 
 The current admin panel provides the first-run setup wizard, dashboard,
 application name and tagline settings, server information, theme choice,
-and logout. Pages require an authenticated Server Admin session; a
-Regular User is redirected to their own account area.
+per-admin appearance preferences, and logout. The preference page is
+`/server/{admin_path}/{admin_username}/preferences`; it stores theme,
+font size, reduced motion, date format, and time format in the administrator's
+own preferences. Pages require an authenticated Server Admin session; a
+Regular User is redirected to their own account area. An administrator can
+only read or update their own preference page.
 
 Guest appearance and language preferences are separate from the admin
 panel and live at `/server/preferences`. This path is reserved and cannot

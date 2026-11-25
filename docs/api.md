@@ -88,6 +88,7 @@ currently empty.
 | DELETE | `/api/{api_version}/orgs/{slug}/tokens/{token_id}` | Organization admin or owner | Revoke an organization token. |
 | GET, POST | `/api/{api_version}/orgs/{slug}/zones` | Organization member for GET; admin or owner for POST | List or create DNS zones. Creation returns a pending zone and a one-time `_verify.<zone>` TXT challenge. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization member | Read a DNS zone. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/export` | Organization member | Download the zone and records as BIND (default), JSON, or CSV. |
 | PATCH, DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization admin or owner | Update or delete a DNS zone. |
 | POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/verification` | Organization admin or owner | Verify the published TXT challenge and activate the zone. |
 | GET, POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records` | Organization member for GET; editor, admin, or owner for POST | List or create validated DNS records. |
@@ -104,9 +105,14 @@ currently empty.
 
 The API currently exposes user, organization, and custom-domain management;
 Zone names are unique across organizations and remain pending until the owner
-publishes the one-time TXT value returned by zone creation at
-`_verify.<zone>`. Record owners and RDATA are validated before storage, and
-every zone and record lookup is organization-scoped.
+publishes the TXT value returned by zone creation at `_verify.<zone>`. The
+server-rendered organization page also provides zone creation, record entry,
+ownership verification forms, and BIND, JSON, and CSV downloads. After creating
+a zone it redirects to the zone page, where the pending TXT instructions
+remain available to authorized organization administrators. The recoverable
+challenge is encrypted at rest and cleared after verification. Record owners
+and RDATA are validated before storage, and every zone and record lookup is
+organization-scoped.
 
 Content negotiation is honored on every route (`Accept:
 application/json`, `text/plain`, `text/html` where applicable).

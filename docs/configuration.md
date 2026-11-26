@@ -24,15 +24,21 @@ Settings resolve in priority order: CLI flag > environment variable >
 built-in default. Maps merge by key; a later scalar or list replaces the
 earlier value.
 
-`secrets.yml` is an optional private `0600` file merged last. The config
-loader currently stores encryption keys, SMTP/cache/database passwords,
-credential-bearing cache/database URLs, backup encryption passwords,
-metrics tokens, configured contact webhook URLs, LDAP bind passwords, and OIDC
-client secrets there. LDAP and OIDC provider credentials merge with providers
-by `name`. Supported credentials found in `server.yml` or a `yaml.d/` drop-in
-are written to `secrets.yml` before their source file is rewritten without
-those values. Other secret paths in AI.md that do not have a config model yet
-remain unimplemented.
+`secrets.yml` is an optional private `0600` file merged last. It stores the
+operator token, encryption key, generated metrics credentials, SMTP/cache/
+database passwords and tokens, credential-bearing cache/database URLs, backup
+encryption password, contact webhook URLs and signing secrets, LDAP bind
+passwords, and OIDC client secrets. LDAP and OIDC provider credentials merge
+with providers by `name`. Supported credentials found in `server.yml` or a
+`yaml.d/` drop-in are written to `secrets.yml` before their source file is
+rewritten without those values. Other secret paths in AI.md that do not yet
+have a config model remain unimplemented.
+
+On first start, redxt creates `server.token` (`adm_` plus 32 random base62
+characters) and the three `mtr_` metrics tokens, stores them in `secrets.yml`,
+and audits their key names without logging their values. The operator token
+is printed once to the startup console. Metrics tokens remain in the private
+file and authorize only their metrics service.
 
 Drop-in files are regular `*.yml` and `*.yaml` files directly under
 `yaml.d/`; hidden files and nested directories are ignored. Symlinks are

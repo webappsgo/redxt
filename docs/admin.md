@@ -7,8 +7,11 @@ segment defaults to `administration` but is fully configurable in
 `server.yml`.
 
 On first run, redxt serves a setup wizard at `/server/{admin_path}/setup`
-and prints a one-time setup token to the console/log. Completing the
-wizard creates the **Primary Admin** account, which cannot be deleted.
+and prints a one-time setup token to the console. It also creates the
+operator API token (`server.token`) and prints that credential once. The
+operator token is stored in `secrets.yml`, never in `server.yml` or the
+database. Completing the wizard creates the **Primary Admin** account, which
+cannot be deleted.
 The setup form defaults the username to `steward`; operators may choose
 another name that passes the same checks.
 Admin usernames must pass the shared reserved-name and route-collision
@@ -35,6 +38,9 @@ Guest appearance and language preferences are separate from the admin
 panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.
 
-The wider settings, audit, security, backup, update, cluster, and agent
-management surfaces are not currently exposed by the admin panel. The
-browser UI is server-rendered and its forms work without JavaScript.
+The backup page supports manual creation, listing, archive verification, and
+deletion with incremental-base protection. Backup restore, download, and
+policy editing remain unavailable in the panel. The wider settings, audit,
+security, update, cluster, and agent management surfaces also remain
+incomplete. The browser UI is server-rendered and its forms work without
+JavaScript.

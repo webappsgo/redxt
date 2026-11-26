@@ -64,4 +64,8 @@ incremental's base full is protected so the pair remains restorable. The size
 cap considers all backup files; if it cannot be met without deleting a
 protected base, the cap remains exceeded and a warning is logged.
 
-The backup manager is not yet available in the admin panel.
+The authenticated admin panel at `/server/{admin_path}/backup` can create a
+manual backup, list archives, verify an archive, and delete an archive. It
+refuses to delete a full backup that a retained incremental needs. Restore,
+download, and backup policy editing are not yet exposed in the panel; use the
+maintenance restore command for restores.

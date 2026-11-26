@@ -31,8 +31,13 @@ encryption password, CAPTCHA and CVE API secrets, contact webhook URLs and
 signing secrets, LDAP bind passwords, and OIDC client secrets. LDAP and OIDC
 provider credentials merge with providers by `name`. Supported credentials found in `server.yml` or a
 `yaml.d/` drop-in are written to `secrets.yml` before their source file is
-rewritten without those values. DNS-01 credentials remain unimplemented in
-the config model and therefore are not yet encrypted or migrated.
+rewritten without those values. DNS-01 credentials use the flat
+`server.ssl.letsencrypt.dns_credentials` map keyed by lego environment variable
+name; plaintext values are encrypted into `secrets.yml` after the server
+encryption key is available and decrypted only in memory. DNS provider
+construction is checked at startup and before certificate requests when
+DNS-01 is selected, and issuance uses the configured lego provider. The admin
+editor, issuance status tracking, and key-rotation support remain in progress.
 
 On first start, redxt creates `server.token` (`adm_` plus 32 random base62
 characters) and the three `mtr_` metrics tokens, stores them in `secrets.yml`,
@@ -54,6 +59,15 @@ Privacy and consent settings belong in `yaml.d/privacy.yml`. On startup,
 legacy `server.privacy` values in `server.yml` are migrated there and removed
 from `server.yml`; the area file is created atomically with mode `0600` inside
 the `yaml.d/` directory (mode `0700`).
+
+## Browser CSRF
+
+The double-submit CSRF cookie is controlled by `server.csrf` in the merged
+configuration. `enabled` defaults to `true`; `secure` accepts `auto`,
+`true`, or `false` and defaults to `auto`, which sets the cookie's `Secure`
+attribute when the request scheme resolves to HTTPS. `exempt_paths` lists
+frontend paths that cannot use browser form tokens; backend API and other
+protocol routes are outside CSRF validation.
 
 ## Environment Variables
 

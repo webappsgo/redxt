@@ -26,8 +26,12 @@ authenticates and starts a session).
 ## Available pages
 
 The current admin panel provides the first-run setup wizard, dashboard,
-application name and tagline settings, server information, theme choice,
-per-admin appearance preferences, and logout. The preference page is
+application name and tagline settings, a read-only SSL/TLS configuration
+summary at `/server/{admin_path}/ssl`, server information, theme choice,
+per-admin appearance preferences, and logout. The SSL/TLS summary shows
+configured certificate paths and ACME options, but never reads or displays
+certificate or private-key contents. SSL/TLS editing and renewal actions are
+not available in the panel yet. The preference page is
 `/server/{admin_path}/{admin_username}/preferences`; it stores theme,
 font size, reduced motion, date format, and time format in the administrator's
 own preferences. Pages require an authenticated Server Admin session; a

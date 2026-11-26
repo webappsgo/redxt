@@ -27,7 +27,8 @@ authenticates and starts a session).
 
 The current admin panel provides the first-run setup wizard, dashboard,
 application name and tagline settings, editable SSL/TLS and ACME settings at
-`/server/{admin_path}/ssl`, server information, theme choice, per-admin
+`/server/{admin_path}/ssl`, Server Admin API token management at
+`/server/{admin_path}/security/tokens`, server information, theme choice, per-admin
 appearance preferences, and logout. The SSL/TLS form includes the complete
 lego DNS provider list and a free-form `VARIABLE=value` credential editor;
 credential values are never returned to the page. Operators can set certificate
@@ -56,13 +57,24 @@ generated `adm_` token once and invalidates the previous default token. These
 profile routes require a stored token belonging to the named admin; the
 operator token cannot read or rotate an admin's personal token.
 
+The API Tokens page creates `adm_` tokens with global, read-write, or read
+scope and the configured default, Never, preset, or custom expiration. A new token is shown once; the
+database stores only its SHA-256 hash. The page lists only the signed-in
+administrator's own tokens and revokes them without deleting their audit
+history. Creation and revocation are recorded as `token.created` and
+`token.revoked` events. The bearer API also provides the server-wide token
+inventory, revocation, and rotation routes documented in [the API reference](api.md).
+The inventory returns metadata only; rotation preserves the token's current
+scope and expiry, invalidates its prior secret, and returns the replacement
+once with `Cache-Control: no-store`.
+
 Guest appearance and language preferences are separate from the admin
 panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.
 
 The backup page supports manual creation, listing, archive verification,
 deletion with incremental-base protection, and archive downloads. Backup
-restore and policy editing remain unavailable in the panel. The wider settings, audit,
-security, update, cluster, and agent management surfaces also remain
-incomplete. The browser UI is server-rendered and its forms work without
-JavaScript.
+restore and policy editing remain unavailable in the panel. The wider settings,
+audit, update, cluster, and agent management surfaces remain incomplete. The
+browser UI is server-rendered and its forms work without JavaScript; clipboard
+support for one-time tokens is an optional enhancement.

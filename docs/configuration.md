@@ -70,6 +70,17 @@ attribute when the request scheme resolves to HTTPS. `exempt_paths` lists
 frontend paths that cannot use browser form tokens; backend API and other
 protocol routes are outside CSRF validation.
 
+## API Token Lifetimes
+
+`server.security.tokens` sets the default finite lifetime, maximum finite
+lifetime, and rotation reminder interval for API tokens. The default lifetime
+is `0` (no expiry), the maximum is `365d`, and the reminder interval is
+`90d`. The admin token form starts with the configured default and still lets
+an administrator explicitly choose Never, a supported preset, or a custom
+expiration. Finite expirations beyond `max_expiry` are rejected. Invalid
+values fall back to the documented defaults; a reminder later than the maximum
+lifetime is reduced to the maximum.
+
 ## Environment Variables
 
 Init-only variables apply only on first run and are then persisted into

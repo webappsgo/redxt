@@ -79,10 +79,14 @@ Markdown text.
 | POST | `/api/{api_version}/server/{admin_path}/ssl/renew` | Global-scope Bearer operator or Server Admin token | Force renewal of managed ACME certificates. |
 | GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Bearer token owned by that Server Admin | Read the default token's prefix and mask. |
 | POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Global-scope Bearer token owned by that Server Admin | Replace the default token and return the new `adm_` value once. |
+| GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata; secrets and hashes are never returned. |
+| DELETE | `/api/{api_version}/server/{admin_path}/security/tokens/{id}` | Global-scope Bearer operator or Server Admin token | Revoke a token while retaining its audit history. |
+| POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
 
 The operator token can call SSL routes but is not tied to a personal admin
 account, so it cannot read or regenerate a profile token. Regeneration makes
-the previous default token unusable.
+the previous default token unusable. Token list and rotate responses omit
+stored hashes; rotate responses use `Cache-Control: no-store`.
 
 #### Users and credentials
 

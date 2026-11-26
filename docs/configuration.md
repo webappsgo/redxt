@@ -20,8 +20,16 @@ file, atomically replace `server.yml`, and sync the directory where the
 operating system supports directory syncing.
 
 Settings resolve in priority order: CLI flag > environment variable >
-`yaml.d/` area files in filename order > `server.yml` > built-in default.
-Maps merge by key; a later scalar or list replaces the earlier value.
+`secrets.yml` > `yaml.d/` area files in filename order > `server.yml` >
+built-in default. Maps merge by key; a later scalar or list replaces the
+earlier value.
+
+`secrets.yml` is an optional private `0600` file merged last. The config
+loader currently stores encryption keys, SMTP/cache/database passwords,
+credential-bearing cache/database URLs, backup encryption passwords,
+metrics tokens, and configured contact webhook URLs there. Those values are
+removed from `server.yml` on save. Other secret paths in AI.md that do not
+have a config model yet remain unimplemented.
 
 Drop-in files are regular `*.yml` and `*.yaml` files directly under
 `yaml.d/`; hidden files and nested directories are ignored. Symlinks are

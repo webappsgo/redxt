@@ -9,6 +9,12 @@ segment defaults to `administration` but is fully configurable in
 On first run, redxt serves a setup wizard at `/server/{admin_path}/setup`
 and prints a one-time setup token to the console/log. Completing the
 wizard creates the **Primary Admin** account, which cannot be deleted.
+The setup form defaults the username to `steward`; operators may choose
+another name that passes the same checks.
+Admin usernames must pass the shared reserved-name and route-collision
+checks. The additional blocklist used for Regular User usernames does not
+apply to Server Admins; a reserved or conflicting setup name receives the
+same generic conflict response as another name collision.
 
 Sign-in for admins and regular users happens through the server-rendered
 login form at `/server/auth/login` (`GET` renders the form, `POST`

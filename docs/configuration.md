@@ -28,7 +28,10 @@ Drop-in files are regular `*.yml` and `*.yaml` files directly under
 accepted only when their target remains inside `yaml.d/`. The directory is
 restricted to mode `0700` and loaded files to `0600`. An unparseable file
 is ignored with a warning; malformed `server.yml` uses built-in defaults
-and is left in place for repair.
+and is left in place for repair. Invalid individual values, explicit nulls,
+duplicate keys, and unknown keys are handled independently with a warning
+that names the source file, line, and key, so valid neighboring settings
+remain active.
 
 ## Environment Variables
 

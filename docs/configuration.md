@@ -27,9 +27,12 @@ earlier value.
 `secrets.yml` is an optional private `0600` file merged last. The config
 loader currently stores encryption keys, SMTP/cache/database passwords,
 credential-bearing cache/database URLs, backup encryption passwords,
-metrics tokens, and configured contact webhook URLs there. Those values are
-removed from `server.yml` on save. Other secret paths in AI.md that do not
-have a config model yet remain unimplemented.
+metrics tokens, configured contact webhook URLs, LDAP bind passwords, and OIDC
+client secrets there. LDAP and OIDC provider credentials merge with providers
+by `name`. Supported credentials found in `server.yml` or a `yaml.d/` drop-in
+are written to `secrets.yml` before their source file is rewritten without
+those values. Other secret paths in AI.md that do not have a config model yet
+remain unimplemented.
 
 Drop-in files are regular `*.yml` and `*.yaml` files directly under
 `yaml.d/`; hidden files and nested directories are ignored. Symlinks are

@@ -50,6 +50,11 @@ duplicate keys, and unknown keys are handled independently with a warning
 that names the source file, line, and key, so valid neighboring settings
 remain active.
 
+Privacy and consent settings belong in `yaml.d/privacy.yml`. On startup,
+legacy `server.privacy` values in `server.yml` are migrated there and removed
+from `server.yml`; the area file is created atomically with mode `0600` inside
+the `yaml.d/` directory (mode `0700`).
+
 ## Environment Variables
 
 Init-only variables apply only on first run and are then persisted into

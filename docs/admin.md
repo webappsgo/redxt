@@ -6,6 +6,11 @@ The admin panel is isolated under `/server/{admin_path}` — the path
 segment defaults to `administration` but is fully configurable in
 `server.yml`.
 
+The path segment must be 2–32 lowercase letters, numbers, or interior
+hyphens. Server routes such as `api`, `health`, `about`, `privacy`,
+`security`, and `preferences` are reserved; invalid configuration falls back
+to `administration`.
+
 On first run, redxt serves a setup wizard at `/server/{admin_path}/setup`
 and prints a one-time setup token to the console. It also creates the
 operator API token (`server.token`) and prints that credential once. The
@@ -21,7 +26,8 @@ same generic conflict response as another name collision.
 
 Sign-in for admins and regular users happens through the server-rendered
 login form at `/server/auth/login` (`GET` renders the form, `POST`
-authenticates and starts a session).
+authenticates and starts a session). Admin sessions have a 30-day absolute
+lifetime, matching the server admin session policy in AI.md PART 17.
 
 ## Available pages
 
@@ -62,7 +68,8 @@ scope and the configured default, Never, preset, or custom expiration. A new tok
 database stores only its SHA-256 hash. The page lists only the signed-in
 administrator's own tokens and revokes them without deleting their audit
 history. Creation and revocation are recorded as `token.created` and
-`token.revoked` events. The bearer API also provides the server-wide token
+`token.revoked` events. Active tokens are marked for rotation when they reach
+the configured reminder age. The bearer API also provides the server-wide token
 inventory, revocation, and rotation routes documented in [the API reference](api.md).
 The inventory returns metadata only; rotation preserves the token's current
 scope and expiry, invalidates its prior secret, and returns the replacement
@@ -73,8 +80,11 @@ panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.
 
 The backup page supports manual creation, listing, archive verification,
-deletion with incremental-base protection, and archive downloads. Backup
-restore and policy editing remain unavailable in the panel. The wider settings,
-audit, update, cluster, and agent management surfaces remain incomplete. The
-browser UI is server-rendered and its forms work without JavaScript; clipboard
-support for one-time tokens is an optional enhancement.
+deletion with incremental-base protection, and archive downloads. The bearer
+API at `/api/{api_version}/server/{admin_path}/backup` supports archive listing
+and creation, metadata lookup, deletion, and download; mutations require a
+global-scope token. Restore and backup policy editing remain unavailable in the
+panel/API. The wider settings, audit, update, cluster, and agent management
+surfaces remain incomplete. The browser UI is server-rendered and its forms
+work without JavaScript; clipboard support for one-time tokens is an optional
+enhancement.

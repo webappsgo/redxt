@@ -79,7 +79,10 @@ is `0` (no expiry), the maximum is `365d`, and the reminder interval is
 an administrator explicitly choose Never, a supported preset, or a custom
 expiration. Finite expirations beyond `max_expiry` are rejected. Invalid
 values fall back to the documented defaults; a reminder later than the maximum
-lifetime is reduced to the maximum.
+lifetime is reduced to the maximum. The admin token list marks active tokens
+for rotation once their age reaches `rotation_reminder`. Regular User token
+defaults remain controlled by `server.users.tokens.expiration_days`, and are
+also bounded by `max_expiry`.
 
 ## Environment Variables
 
@@ -182,6 +185,7 @@ server:
 ## Admin Panel
 
 The admin panel path is configurable (default `administration`) and is
-served under `/server/{admin_path}`. The `preferences` segment is reserved
-for guest preferences and falls back to the default admin path. See
-[Admin Panel](admin.md).
+served under `/server/{admin_path}`. It must be 2–32 lowercase letters,
+numbers, or interior hyphens and cannot use a reserved server route such as
+`api`, `health`, `about`, `privacy`, `security`, or `preferences`. An invalid
+configured value falls back to `administration`. See [Admin Panel](admin.md).

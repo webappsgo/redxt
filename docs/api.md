@@ -41,8 +41,9 @@ currently empty.
 
 #### Public server information
 
-The server-rendered pages are available at `/server/about`, `/server/help`,
-`/server/privacy`, and `/server/preferences`. The privacy page displays the
+`/server` permanently redirects to `/server/about`. The server-rendered pages
+are available at `/server/about`, `/server/help`, `/server/privacy`, and
+`/server/preferences`. The privacy page displays the
 effective deployment privacy settings. Its consent form posts to
 `POST /server/consent`; when data sale is enabled, the page and preferences
 page provide a `POST /server/ccpa` opt-out control. These browser forms require
@@ -79,14 +80,22 @@ Markdown text.
 | POST | `/api/{api_version}/server/{admin_path}/ssl/renew` | Global-scope Bearer operator or Server Admin token | Force renewal of managed ACME certificates. |
 | GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Bearer token owned by that Server Admin | Read the default token's prefix and mask. |
 | POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Global-scope Bearer token owned by that Server Admin | Replace the default token and return the new `adm_` value once. |
-| GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata; secrets and hashes are never returned. |
+| GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata, including whether an active token has reached the configured rotation reminder age; secrets and hashes are never returned. |
 | DELETE | `/api/{api_version}/server/{admin_path}/security/tokens/{id}` | Global-scope Bearer operator or Server Admin token | Revoke a token while retaining its audit history. |
 | POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
+| GET, POST | `/api/{api_version}/server/{admin_path}/backup` | Bearer Server Admin token for GET; global-scope token for POST | List archive metadata or create and verify a manual backup. |
+| GET, DELETE | `/api/{api_version}/server/{admin_path}/backup/{id}` | Bearer Server Admin token for GET; global-scope token for DELETE | Read archive metadata or delete an archive; deletion of a retained incremental base returns a conflict. |
+| GET | `/api/{api_version}/server/{admin_path}/backup/{id}/download` | Bearer Server Admin token | Download the archive with private no-store caching. |
 
 The operator token can call SSL routes but is not tied to a personal admin
 account, so it cannot read or regenerate a profile token. Regeneration makes
 the previous default token unusable. Token list and rotate responses omit
 stored hashes; rotate responses use `Cache-Control: no-store`.
+Backup creation accepts a JSON object with optional `filename`, `password`,
+`include_ssl`, and `include_data` fields. An omitted password uses the
+configured backup encryption password. Responses expose archive metadata only,
+never an on-disk path or checksum. Restore remains available through the
+maintenance command and is not yet exposed through the admin API.
 
 #### Users and credentials
 

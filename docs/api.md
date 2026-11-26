@@ -41,6 +41,13 @@ currently empty.
 
 #### Public server information
 
+The server-rendered pages are available at `/server/about`, `/server/help`,
+`/server/privacy`, and `/server/preferences`. The privacy page displays the
+effective deployment privacy settings. Its consent form posts to
+`POST /server/consent`; when data sale is enabled, the page and preferences
+page provide a `POST /server/ccpa` opt-out control. These browser forms require
+the double-submit CSRF token.
+
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |

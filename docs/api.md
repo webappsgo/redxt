@@ -71,6 +71,19 @@ Markdown text.
 | POST | `/api/{api_version}/server/auth/password/reset` | Public reset token | Set a password using a reset token. |
 | POST | `/api/{api_version}/server/auth/verify/{code}` | Public | Verify an email address. |
 
+#### Server admin
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET, PATCH | `/api/{api_version}/server/{admin_path}/ssl` | Bearer operator token or stored Server Admin token | Read or update SSL/TLS and ACME settings. DNS credential values are write-only. |
+| POST | `/api/{api_version}/server/{admin_path}/ssl/renew` | Global-scope Bearer operator or Server Admin token | Force renewal of managed ACME certificates. |
+| GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Bearer token owned by that Server Admin | Read the default token's prefix and mask. |
+| POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Global-scope Bearer token owned by that Server Admin | Replace the default token and return the new `adm_` value once. |
+
+The operator token can call SSL routes but is not tied to a personal admin
+account, so it cannot read or regenerate a profile token. Regeneration makes
+the previous default token unusable.
+
 #### Users and credentials
 
 | Method | Path | Authentication | Purpose |

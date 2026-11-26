@@ -49,6 +49,13 @@ operator token or a usable stored Server Admin API token in the
 the API but are never included in its responses; responses include configured
 credential variable names only.
 
+An admin can inspect the masked default API token and replace it at
+`/api/{api_version}/server/{admin_path}/{admin_username}/profile/token`.
+`GET` returns only the token prefix and a mask. `POST` returns a newly
+generated `adm_` token once and invalidates the previous default token. These
+profile routes require a stored token belonging to the named admin; the
+operator token cannot read or rotate an admin's personal token.
+
 Guest appearance and language preferences are separate from the admin
 panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.

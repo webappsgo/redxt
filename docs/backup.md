@@ -15,9 +15,11 @@ unless compliance mode blocks the operation. Scheduled backups use the saved
 backup password and do not prompt.
 
 The archive includes `server.yml`, local `server.db` and `users.db` files,
-`secrets.yml`, `yaml.d/`, `assets/`, and configured template and theme files
+`app_secrets.json`, `secrets.yml`, `yaml.d/`, `assets/`, and configured template and theme files
 when present. The copy of `server.token` is blanked. Database files are
-snapshotted with SQLite `VACUUM INTO`. Referenced database and cache TLS files
+snapshotted with SQLite `VACUUM INTO`; `app_secrets.json` is exported from the
+same server database snapshot and restores the allowlisted cryptographic keys,
+including available previous versions and their expiry timestamps. Referenced database and cache TLS files
 are always included. Manually configured certificate and key files outside
 the SSL directory are stored under `ssl-external/`; restore moves them into
 the target SSL directory and rewrites `server.ssl.cert` and `server.ssl.key`.
@@ -51,9 +53,19 @@ the base hash is checked before any restore writes begin. The restore applies
 the changed files over the base and then removes the paths listed in the
 incremental manifest.
 
+Archive verification and restore enforce `server.restore` limits before and
+during extraction. Defaults are a 1 GiB archive, 4 GiB expanded content,
+10,000 files, 512 MiB per file, and a 100:1 expansion ratio. Incremental
+restores apply the expanded-size, file-count, total-archive, and ratio limits
+to the base and incremental together. Extracted file permissions are
+normalized; archive executable bits are not preserved.
+
 The target's operator token is kept when one exists. Otherwise restore creates
 a new operator token and prints it once. A restore onto an empty database also
-prints the one-time setup token needed to recreate the Primary Admin.
+prints a one-time setup token and stores only its SHA-256 hash in the restored
+server database. The CLI token is prepared for the new-server Primary Admin
+re-authentication flow; the server-side flow that accepts it while preserving
+the restored admin credentials is still outstanding.
 
 ## Retention
 

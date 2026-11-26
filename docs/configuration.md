@@ -61,6 +61,20 @@ legacy `server.privacy` values in `server.yml` are migrated there and removed
 from `server.yml`; the area file is created atomically with mode `0600` inside
 the `yaml.d/` directory (mode `0700`).
 
+`server.restore` limits untrusted backup extraction:
+
+| Setting | Default | Purpose |
+|---|---:|---|
+| `max_archive_size` | `1G` | Maximum compressed archive size |
+| `max_expanded_size` | `4G` | Maximum expanded bytes, including an incremental base |
+| `max_files` | `10000` | Maximum files, including the manifest and incremental base |
+| `max_file_size` | `512M` | Maximum expanded size of one file |
+| `max_ratio` | `100` | Maximum expanded-to-compressed ratio |
+
+Invalid non-positive values fall back to these defaults with a configuration
+warning. Each archive is checked before it is read and each entry is bounded
+while streaming from the tar reader.
+
 ## Browser CSRF
 
 The double-submit CSRF cookie is controlled by `server.csrf` in the merged

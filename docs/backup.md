@@ -1,0 +1,65 @@
+# Backup and Restore
+
+## Create a backup
+
+Run a one-time backup with:
+
+```sh
+redxt --maintenance backup
+```
+
+Supply `--include-ssl` to include the configured SSL directory and
+`--include-data` to include the data directory. A custom filename and
+`--password` are also accepted. Without a password, the archive is unencrypted
+unless compliance mode blocks the operation. Scheduled backups use the saved
+backup password and do not prompt.
+
+The archive includes `server.yml`, local `server.db` and `users.db` files,
+`secrets.yml`, `yaml.d/`, `assets/`, and configured template and theme files
+when present. The copy of `server.token` is blanked. Database files are
+snapshotted with SQLite `VACUUM INTO`. Referenced external TLS files and the
+database/cache TLS file keys are not yet included by the current backup
+implementation.
+
+## Scheduled backups
+
+The first daily run creates a full backup. Later runs create a cumulative
+incremental from the previous full to the current snapshot, verify it, then
+create the full backup for that same snapshot. Incrementals contain changed
+files and a list of removed paths; changed SQLite databases are stored whole.
+The hourly task creates an incremental from the newest full and requires that
+a full backup already exists.
+
+Both full and incremental archives carry a manifest with file sizes, Unix
+modification times, SHA-256 hashes, and the snapshot time. Encrypted archives
+use Argon2id and AES-256-GCM. Their authenticated `BKUP1` header includes the
+key identifier and, for incrementals, the base filename.
+
+## Restore
+
+Restore a full archive or an incremental archive with:
+
+```sh
+redxt --maintenance restore <backup-file>
+```
+
+Encrypted archives require `--password` or an interactive password prompt.
+An incremental restore requires its named full base in the same directory;
+the base hash is checked before any restore writes begin. The restore applies
+the changed files over the base and then removes the paths listed in the
+incremental manifest.
+
+The target's operator token is kept when one exists. Otherwise restore creates
+a new operator token and prints it once. A restore onto an empty database also
+prints the one-time setup token needed to recreate the Primary Admin.
+
+## Retention
+
+Full backups are assigned to one exclusive retention bucket: January 1st,
+other first-of-month dates, Sundays, then all remaining dates. Incrementals
+are excluded from count limits and replaced by later runs. A retained
+incremental's base full is protected so the pair remains restorable. The size
+cap considers all backup files; if it cannot be met without deleting a
+protected base, the cap remains exceeded and a warning is logged.
+
+The backup manager is not yet available in the admin panel.

@@ -17,9 +17,11 @@ backup password and do not prompt.
 The archive includes `server.yml`, local `server.db` and `users.db` files,
 `secrets.yml`, `yaml.d/`, `assets/`, and configured template and theme files
 when present. The copy of `server.token` is blanked. Database files are
-snapshotted with SQLite `VACUUM INTO`. Referenced external TLS files and the
-database/cache TLS file keys are not yet included by the current backup
-implementation.
+snapshotted with SQLite `VACUUM INTO`. Referenced database and cache TLS files
+are always included. Manually configured certificate and key files outside
+the SSL directory are stored under `ssl-external/`; restore moves them into
+the target SSL directory and rewrites `server.ssl.cert` and `server.ssl.key`.
+The SSL directory's unrelated files are included only with `--include-ssl`.
 
 ## Scheduled backups
 

@@ -14,8 +14,21 @@ auto-migrated on startup). Default locations:
 Comments in `server.yml` always go above the setting they document,
 never inline.
 
+`server.yml` is a private file and is secured to mode `0600` before it is
+read. Config saves use a temporary file in the same directory, sync the
+file, atomically replace `server.yml`, and sync the directory where the
+operating system supports directory syncing.
+
 Settings resolve in priority order: CLI flag > environment variable >
-config file > built-in default.
+`yaml.d/` area files in filename order > `server.yml` > built-in default.
+Maps merge by key; a later scalar or list replaces the earlier value.
+
+Drop-in files are regular `*.yml` and `*.yaml` files directly under
+`yaml.d/`; hidden files and nested directories are ignored. Symlinks are
+accepted only when their target remains inside `yaml.d/`. The directory is
+restricted to mode `0700` and loaded files to `0600`. An unparseable file
+is ignored with a warning; malformed `server.yml` uses built-in defaults
+and is left in place for repair.
 
 ## Environment Variables
 
@@ -96,6 +109,24 @@ mode, including debug.
 
 On first run, redxt selects a random port in the 64000-64999 range if
 none is configured, and persists the chosen port to `server.yml`.
+
+## Regular User Names
+
+`server.users.username_blocklist_extra` adds exact names to the built-in
+Regular User username blocklist. Values are trimmed, lowercased, and
+Unicode NFKC-normalized at load time. The list only adds restrictions; it
+does not replace built-in entries or affect organization slugs, Server
+Admin usernames, or the shared reserved-name rules.
+It can be set in `server.yml` or `yaml.d/accounts.yml`; the later file
+replaces the whole configured list.
+
+```yaml
+server:
+  users:
+    username_blocklist_extra:
+      - brandname
+      - product-team
+```
 
 ## Admin Panel
 

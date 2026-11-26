@@ -15,5 +15,5 @@ Tasks below are current gaps found while comparing the repository with AI.md and
 - [ ] Complete project user, organization, and custom-domain requirements under SPEC.md and PARTs 34-36.
 - [ ] Finish documented product capabilities that remain placeholders or absent, including DNS roles, cluster/agent runtime, and client behavior.
 - [ ] Reconcile README and all docs with implemented routes, configuration, features, and deployment instructions; complete the required documentation site configuration.
-- [ ] Complete the required test harnesses and coverage, integration, and browser E2E coverage specified by PART 29; `tests/run_tests.sh` now dispatches only to the Docker basic tier, while `tests/docker.sh` still lacks the required full CRUD, setup/auth, endpoint, client/agent, Tor/I2P, and teardown checks.
+- [ ] Complete the required test harnesses and coverage, integration, and browser E2E coverage specified by PART 29; `tests/run_tests.sh` dispatches to the Docker basic tier, and `tests/docker.sh` now checks setup/auth, health, and binary renaming but still lacks full CRUD, endpoint, Tor/I2P, and required teardown checks.
 - [ ] Recheck all AI.md final compliance requirements and resolve newly discovered implementation gaps.

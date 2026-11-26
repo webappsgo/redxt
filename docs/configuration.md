@@ -27,12 +27,12 @@ earlier value.
 `secrets.yml` is an optional private `0600` file merged last. It stores the
 operator token, encryption key, generated metrics credentials, SMTP/cache/
 database passwords and tokens, credential-bearing cache/database URLs, backup
-encryption password, contact webhook URLs and signing secrets, LDAP bind
-passwords, and OIDC client secrets. LDAP and OIDC provider credentials merge
-with providers by `name`. Supported credentials found in `server.yml` or a
+encryption password, CAPTCHA and CVE API secrets, contact webhook URLs and
+signing secrets, LDAP bind passwords, and OIDC client secrets. LDAP and OIDC
+provider credentials merge with providers by `name`. Supported credentials found in `server.yml` or a
 `yaml.d/` drop-in are written to `secrets.yml` before their source file is
-rewritten without those values. Other secret paths in AI.md that do not yet
-have a config model remain unimplemented.
+rewritten without those values. DNS-01 credentials remain unimplemented in
+the config model and therefore are not yet encrypted or migrated.
 
 On first start, redxt creates `server.token` (`adm_` plus 32 random base62
 characters) and the three `mtr_` metrics tokens, stores them in `secrets.yml`,

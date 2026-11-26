@@ -65,7 +65,8 @@ cap considers all backup files; if it cannot be met without deleting a
 protected base, the cap remains exceeded and a warning is logged.
 
 The authenticated admin panel at `/server/{admin_path}/backup` can create a
-manual backup, list archives, verify an archive, and delete an archive. It
-refuses to delete a full backup that a retained incremental needs. Restore,
-download, and backup policy editing are not yet exposed in the panel; use the
-maintenance restore command for restores.
+manual backup, list archives, verify an archive, delete an archive, and
+download an archive as a no-store attachment. It refuses to delete a full
+backup that a retained incremental needs. Restore and backup policy editing
+are not yet exposed in the panel; use the maintenance restore command for
+restores.

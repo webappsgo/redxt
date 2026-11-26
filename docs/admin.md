@@ -38,9 +38,9 @@ Guest appearance and language preferences are separate from the admin
 panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.
 
-The backup page supports manual creation, listing, archive verification, and
-deletion with incremental-base protection. Backup restore, download, and
-policy editing remain unavailable in the panel. The wider settings, audit,
+The backup page supports manual creation, listing, archive verification,
+deletion with incremental-base protection, and archive downloads. Backup
+restore and policy editing remain unavailable in the panel. The wider settings, audit,
 security, update, cluster, and agent management surfaces also remain
 incomplete. The browser UI is server-rendered and its forms work without
 JavaScript.

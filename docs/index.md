@@ -23,8 +23,10 @@ docker run --name "redxt-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')" -p
 
 On first run redxt selects a random port in the 64000-64999 range
 (persisted to `server.yml`), prints a one-time setup token to the
-console, and serves the setup wizard until the Primary Admin account is
-created.
+console, creates the operator API credential in `secrets.yml` and prints it
+once, then serves the setup wizard until the Primary Admin account is
+created. These are separate credentials: the setup token completes the
+wizard, while the operator token is the built-in `adm_` API credential.
 
 ## Current Features
 

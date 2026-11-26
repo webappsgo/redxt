@@ -37,7 +37,8 @@ name; plaintext values are encrypted into `secrets.yml` after the server
 encryption key is available and decrypted only in memory. DNS provider
 construction is checked at startup and before certificate requests when
 DNS-01 is selected, and issuance uses the configured lego provider. The admin
-editor, issuance status tracking, and key-rotation support remain in progress.
+panel can edit provider settings without returning credential values.
+Issuance status tracking and key-rotation support remain in progress.
 
 On first start, redxt creates `server.token` (`adm_` plus 32 random base62
 characters) and the three `mtr_` metrics tokens, stores them in `secrets.yml`,

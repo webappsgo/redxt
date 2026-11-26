@@ -39,6 +39,18 @@ does not publish configuration settings or a schema. Release asset inventory
 and binary download routes are not implemented yet, so both version maps are
 currently empty.
 
+#### Public server information
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |
+
+The privacy response is derived from `yaml.d/privacy.yml` (the effective
+`server.privacy` configuration). The `ccpa` object is present only when
+`data.sold` is true and reports the current request's `ccpa_opt_out` cookie.
+The `content.data_usage` field switches between the built-in sold and not-sold
+Markdown text.
+
 #### Authentication
 
 | Method | Path | Authentication | Purpose |

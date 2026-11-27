@@ -44,8 +44,10 @@ currently empty.
 #### Public server information
 
 `/server` permanently redirects to `/server/about`. The server-rendered pages
-are available at `/server/about`, `/server/help`, `/server/privacy`, and
-`/server/preferences`. The privacy page displays the
+are available at `/server/about`, `/server/help`, `/server/help/mcp`,
+`/server/privacy`, and `/server/preferences`. The MCP help page shows the
+request-resolved endpoint, aliases, token setup, connection examples, live
+tools, and the configured project guide. The privacy page displays the
 effective deployment privacy settings. Its consent form posts to
 `POST /server/consent`; when data sale is enabled, the privacy page provides
 the `POST /server/ccpa` opt-out control. The preferences page includes consent
@@ -59,10 +61,12 @@ accepted Preferences consent.
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |
+| GET | `/api/{api_version}/server/help/mcp` | Public | Read MCP endpoint URL, aliases, Bearer scheme, live standard-token tools, and project guide. |
 | GET | `/api/{api_version}/server/preferences` | Public | Read the current browser's effective guest theme, language, and application preferences. |
 | GET | `/api/{api_version}/server/preferences/sync` | Public | Export guest preferences with a canonical share URL and short code. |
 | GET | `/api/{api_version}/server/preferences/sync/import` | Public | Import guest preference cookies from direct query values or a shared `code`. |
 | POST | `/api/{api_version}/server/preferences` | Public | Apply a partial guest preference update from JSON or form fields. |
+| POST | `/api/{api_version}/server/mcp` | Bearer token required | MCP Streamable HTTP endpoint (JSON-RPC 2.0, protocol revision `2026-07-28`). The direct aliases are `/api/mcp` and `/mcp`. |
 
 The matching server-rendered routes are `GET /server/preferences/sync`,
 `POST /server/preferences/sync`, and `GET /server/preferences/sync/import`.
@@ -71,6 +75,18 @@ always redirect with `303` and no response body. API save returns
 `400 VALIDATION_FAILED` only when none of the supplied values pass validation.
 `theme`, `lang`, and `redxt_pref_*` values are portable; consent, CCPA, build,
 session, CSRF, and other credential cookies are never exported or imported.
+
+MCP help is also available as HTML at `GET /server/help/mcp`. Its project
+expansion is configured at `server.pages.help.mcp` in `yaml.d/pages.yml`.
+
+MCP accepts only `POST` and requires `Authorization: Bearer ...` on every
+request. It has no session state or `initialize` handshake. Each request
+supplies `MCP-Protocol-Version`, `Mcp-Method`, and the matching JSON-RPC
+`_meta.io.modelcontextprotocol/protocolVersion`; `tools/call` also supplies
+`Mcp-Name`. The caller's token scope filters the tools returned by
+`tools/list` and accepted by `tools/call`. Browser `Origin` values must match
+the request's own public origin or an explicit CORS origin; a wildcard CORS
+default does not authorize MCP origins.
 
 The privacy response is derived from `yaml.d/privacy.yml` (the effective
 `server.privacy` configuration). The `ccpa` object is present only when
@@ -149,6 +165,14 @@ admin scope. User- and organization-scoped agent routes are not available yet.
 | DELETE | `/api/{api_version}/users/tokens/{token_id}` | Session | Revoke an API token. |
 | POST | `/api/{api_version}/users/invites/{code}` | Session | Accept an organization invitation. |
 | GET | `/api/{api_version}/users/{username}` | Public | Read a public user profile. |
+
+User tokens default to `global` scope within the issuer's role permissions and
+do not expire unless an expiry is selected or configured. `read` tokens can
+call read operations; `read-write` tokens can read and write but cannot delete;
+`global` uses all operations the issuer's role permits. Token creation accepts
+`scope` and `expires_in_days`; the HTML form also offers common expiry choices
+and a custom day count. `agent` scope is reserved for the agent registration
+flow.
 
 #### Organizations and custom domains
 

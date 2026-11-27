@@ -112,6 +112,17 @@ attribute when the request scheme resolves to HTTPS. `exempt_paths` lists
 frontend paths that cannot use browser form tokens; backend API and other
 protocol routes are outside CSRF validation.
 
+## Web Policy
+
+`web.cors` is stored in `yaml.d/web.yml`. Its default `"*"` allows the CORS
+resolution order to use `DOMAIN` and trusted-proxy-learned origins; an explicit
+comma-separated origin list takes precedence, while an empty value disables
+CORS. Credentials are not allowed with the wildcard fallback.
+
+`web.hsts` controls Strict-Transport-Security and is emitted only on TLS
+responses. The default enables a two-year max age with `includeSubDomains` and
+`preload`. Legacy `server.web.*` settings migrate into root `web.*` settings.
+
 ## API Token Lifetimes
 
 `server.security.tokens` sets the default finite lifetime, maximum finite

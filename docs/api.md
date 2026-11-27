@@ -17,6 +17,7 @@ instance's OpenAPI document at `/api/{api_version}/server/swagger`.
 
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
+| GET | `/api/{api_version}` | Public | API root; returns the same discovery envelope as `/api/autodiscover`. A trailing slash redirects to the canonical path. |
 | GET | `/server/healthz` | Public | Content-negotiated health page/API response. |
 | GET | `/healthz` | Public, when enabled | Root health alias. |
 | GET | `/api/{api_version}/server/healthz` | Public | Versioned health response. |
@@ -30,8 +31,9 @@ or `unavailable`, while `state` carries the operator lifecycle value.
 `checks.dns_listener` reports whether the configured Do53 service is bound.
 Unavailable overlays degrade health without taking down the clearnet server.
 
-`/api/autodiscover` is unversioned but uses the standard `{"ok":true,"data":{...}}`
-JSON envelope. The `data` object contains `api.current_version`, `name`,
+`/api/autodiscover` is unversioned. Both it and `/api/{api_version}` use the
+standard `{"ok":true,"data":{...}}` JSON envelope and return the same discovery
+document. The `data` object contains `api.current_version`, `name`,
 `version`, public `urls`, CLI and agent version maps, and their minimum
 versions. Onion and I2P addresses appear only when the corresponding
 `server.tor.expose` or `server.i2p.expose` setting is enabled. The endpoint

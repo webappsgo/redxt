@@ -27,7 +27,7 @@ complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
 - Configurable DNS-over-TLS and DNS-over-QUIC listeners using the shared
   certificate manager
 - Server-rendered setup and administration pages
-- Public about, help, privacy, and preferences pages with no-JavaScript
+- Public landing page at `/`, plus about, help, privacy, and preferences pages with no-JavaScript
   cookie consent, CCPA opt-out controls, and Global Privacy Control handling
 - Public versioned privacy API that reports the effective privacy settings
 - Health endpoints for monitoring the current server
@@ -59,9 +59,10 @@ redxt reads `server.yml`, environment variables, and CLI flags. See
 Current server endpoints include:
 
 - Health: `GET https://redxt.us/server/healthz`
+- API discovery: `GET https://redxt.us/api/v1` (or `/api/autodiscover`)
 - Versioned health: `GET https://redxt.us/api/v1/server/healthz`
 - Privacy details: `GET https://redxt.us/api/v1/server/privacy`
-- Public pages: `/server/about`, `/server/help`, `/server/privacy`, and
+- Public pages: `/`, `/server/about`, `/server/help`, `/server/privacy`, and
   `/server/preferences`
 - DNS-over-HTTPS: `GET https://redxt.us/dns-query?dns={base64url-message}`
   or `POST https://redxt.us/dns-query` with `Content-Type: application/dns-message`

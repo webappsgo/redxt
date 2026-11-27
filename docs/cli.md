@@ -71,5 +71,9 @@ and `--status`.
 redxt-agent --server http://localhost:64580 --status
 ```
 
-`--status` reports agent health and exits `0` when healthy, `1` when
-unhealthy.
+`--status` requests `/server/healthz` from the configured server, prints the
+server's status, version, and mode, and exits `0` for a healthy or
+restart-required server state. It exits `1` when the server cannot be reached
+or reports another state. This check currently reports server health, not the
+local agent's registration or collection status; the foreground enrollment
+and reporting runtime is not available yet.

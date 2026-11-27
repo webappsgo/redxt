@@ -5,8 +5,9 @@ answers for configured primary and secondary zones over DNS UDP/TCP and
 DNS-over-HTTPS, with optional DNS-over-TLS and DNS-over-QUIC listeners when a
 usable certificate is available. The server also provides a web interface for
 setup, administration, regular-user accounts, organizations, DNS zones and
-records, custom-domain verification, and API tokens. The companion CLI and
-agent binaries provide their documented command surfaces.
+records, custom-domain verification, and API tokens. The repository also
+ships the companion `redxt-cli` and `redxt-agent` binaries; their available
+commands and configuration are documented in the [CLI reference](cli.md).
 
 ## Quick Start
 
@@ -33,6 +34,7 @@ wizard, while the operator token is the built-in `adm_` API credential.
   is available
 - Server-rendered public, account, organization, setup, and administration
   pages, with forms that work without JavaScript
+- Public landing page at `/` with configured project content
 - Organization zone and DNS record management, including domain verification
 - Custom-domain verification, API token management, and backup administration
 - Installable PWA with offline handling for eligible public pages

@@ -121,7 +121,8 @@ CORS. Credentials are not allowed with the wildcard fallback.
 
 `web.hsts` controls Strict-Transport-Security and is emitted only on TLS
 responses. The default enables a two-year max age with `includeSubDomains` and
-`preload`. Legacy `server.web.*` settings migrate into root `web.*` settings.
+`preload`; tune it with `web.hsts.max_age_seconds`. Legacy `server.web.*`
+settings migrate into root `web.*` settings.
 
 ## API Token Lifetimes
 

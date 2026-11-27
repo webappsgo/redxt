@@ -82,6 +82,16 @@ any selected log except Audit; the audit log is append-only and may be removed
 only by its configured rotation policy. Auto-refresh reloads the current view
 every 15 seconds when enabled.
 
+The Agents page at `/server/{admin_path}/agents` lists admin-scoped agents,
+their connection state, last-seen time, and health summary. `/agents/add`
+creates a pending agent and a 24-hour, one-use registration token; the token is
+shown once. Selecting an agent opens its details page. Admins can edit an
+agent's name and tags, remove it (revoking its active token and deleting its
+metrics), regenerate its token, and read recent metrics through the bearer
+API. Registration, heartbeat, and metrics reports use an `adm_` token with
+scope `agent`. User- and organization-scoped agent management is not
+implemented yet.
+
 ## Database maintenance dashboard
 
 If either database cannot be opened or checked during startup, the usual
@@ -135,7 +145,7 @@ creation, metadata lookup, deletion, and download. `POST
 /api/{api_version}/server/{admin_path}/backup/restore` accepts `backup_file` and
 an optional `password`; it requires a global-scope token and requests the same
 graceful restart after the restore completes. Backup policy editing remains
-unavailable in the panel/API. The wider settings, audit, cluster, and
-agent management surfaces remain incomplete. The browser UI is server-rendered
+unavailable in the panel/API. The wider settings, audit, and cluster surfaces
+remain incomplete. The browser UI is server-rendered
 and its forms work without JavaScript; clipboard support for one-time tokens is
 an optional enhancement.

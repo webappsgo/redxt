@@ -4,6 +4,11 @@ redxt serves its web pages from Go templates. Forms and navigation work with
 JavaScript disabled; the bundled script adds install prompts, connection
 status, service worker updates, and recovery after a server restart.
 
+The root page (`/`) is the public landing page. It uses the configured
+application name and tagline, the project description and implemented feature
+summary, and links to About, Help, and sign-in. The shared navigation exposes
+registration when it is enabled and account pages after sign-in.
+
 ## Install redxt
 
 Open the site over HTTPS in a supported browser and use its install or

@@ -1,15 +1,12 @@
 # redxt
 
-**redxt** is an in-development DNS platform. The current server provides
-authoritative answers for configured primary and secondary zones over DNS
-UDP/TCP and DNS-over-HTTPS, with optional DoT/DoQ listeners when a usable
-certificate is available. Recursive resolution, forwarding, DNS firewall,
-hosted dynamic DNS, HTTP redirects, DNS-distributed data, clustering, and
-managed-agent workflows are product requirements that remain in progress.
-
-The product is intended to consolidate DNS roles in one service; only the
-authoritative, DoH, DoT, and DoQ surfaces described above are currently
-implemented.
+**redxt** is a self-hosted DNS platform. Its server provides authoritative
+answers for configured primary and secondary zones over DNS UDP/TCP and
+DNS-over-HTTPS, with optional DNS-over-TLS and DNS-over-QUIC listeners when a
+usable certificate is available. The server also provides a web interface for
+setup, administration, regular-user accounts, organizations, DNS zones and
+records, custom-domain verification, and API tokens. The companion CLI and
+agent binaries provide their documented command surfaces.
 
 ## Quick Start
 
@@ -34,13 +31,15 @@ wizard, while the operator token is the built-in `adm_` API credential.
 - RFC 8484 DNS-over-HTTPS at `/dns-query` on HTTPS
 - DNS-over-TLS and DNS-over-QUIC on configured listeners when a certificate
   is available
-- Server-rendered setup and administration surfaces
-- Companion CLI and agent binaries with functionality still under
-  development
+- Server-rendered public, account, organization, setup, and administration
+  pages, with forms that work without JavaScript
+- Organization zone and DNS record management, including domain verification
+- Custom-domain verification, API token management, and backup administration
+- Installable PWA with offline handling for eligible public pages
+- Companion `redxt-cli` and `redxt-agent` binaries
 
-See the [implementation backlog](https://github.com/webappsgo/redxt/blob/main/TODO.AI.md)
-for current status and [IDEA.md](https://github.com/webappsgo/redxt/blob/main/IDEA.md)
-for the product requirements.
+See the guides below for the current browser, administration, configuration,
+and API behavior.
 
 ## Documentation
 

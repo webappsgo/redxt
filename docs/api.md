@@ -83,6 +83,13 @@ Markdown text.
 | GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata, including whether an active token has reached the configured rotation reminder age; secrets and hashes are never returned. |
 | DELETE | `/api/{api_version}/server/{admin_path}/security/tokens/{id}` | Global-scope Bearer operator or Server Admin token | Revoke a token while retaining its audit history. |
 | POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
+| GET, POST | `/api/{api_version}/server/{admin_path}/agents` | Bearer operator or stored Server Admin token | List admin-scoped agents or create a registration token. POST accepts `name` and optional `tags`; the new `adm_` token is shown once and expires after 24 hours until registration. |
+| POST | `/api/{api_version}/server/{admin_path}/agents/register` | Admin agent token (`adm_`, scope `agent`) | Register the pending agent once with hostname, OS, architecture, version, tags, and optional display name. |
+| POST | `/api/{api_version}/server/{admin_path}/agents/heartbeat` | Registered admin agent token | Update liveness, IP address, uptime, version, and update availability. |
+| POST | `/api/{api_version}/server/{admin_path}/agents/report` | Registered admin agent token | Store up to 100 oldest-first metric samples. |
+| GET, PATCH, DELETE | `/api/{api_version}/server/{admin_path}/agents/{name}` | Bearer operator or stored Server Admin token | Read details, update the name/tags, or remove the agent and its metric history. |
+| POST | `/api/{api_version}/server/{admin_path}/agents/{name}/token` | Bearer operator or stored Server Admin token | Regenerate the agent credential and return it once with `Cache-Control: no-store`. |
+| GET | `/api/{api_version}/server/{admin_path}/agents/{name}/metrics` | Bearer operator or stored Server Admin token | Read up to 1,000 most recent metric samples (`limit` defaults to 100). |
 | GET, POST | `/api/{api_version}/server/{admin_path}/backup` | Bearer Server Admin token for GET; global-scope token for POST | List archive metadata or create and verify a manual backup. |
 | POST | `/api/{api_version}/server/{admin_path}/backup/restore` | Global-scope Bearer operator or Server Admin token | Restore a named archive after verification; accepts `backup_file` and, when encrypted, `password`, then gracefully exits for service-manager restart. |
 | GET, DELETE | `/api/{api_version}/server/{admin_path}/backup/{id}` | Bearer Server Admin token for GET; global-scope token for DELETE | Read archive metadata or delete an archive; deletion of a retained incremental base returns a conflict. |
@@ -98,6 +105,10 @@ configured backup encryption password. Responses expose archive metadata only,
 never an on-disk path or checksum. Restore accepts `{"backup_file":"...",
 "password":"..."}`; an encrypted archive without a password returns
 `VALIDATION_FAILED`.
+
+Agent management currently covers CRUD, one-time credential creation,
+registration, heartbeat, metrics reporting, and metric-history queries for the
+admin scope. User- and organization-scoped agent routes are not available yet.
 
 #### Users and credentials
 

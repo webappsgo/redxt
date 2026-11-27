@@ -61,10 +61,33 @@ duplicate keys, and unknown keys are handled independently with a warning
 that names the source file, line, and key, so valid neighboring settings
 remain active.
 
-Privacy and consent settings belong in `yaml.d/privacy.yml`. On startup,
-legacy `server.privacy` values in `server.yml` are migrated there and removed
-from `server.yml`; the area file is created atomically with mode `0600` inside
-the `yaml.d/` directory (mode `0700`).
+`server.yml` stores node-local settings. Shared settings belong in the area file
+for their section:
+
+| File | Sections |
+|---|---|
+| `branding.yml` | `server.branding`, `server.seo`, `web.ui` |
+| `web.yml` | `web.*` except `web.ui`; `server.cors`, `server.csrf`, `server.url_detection`, `server.compression`, `server.healthz`, `server.i18n` |
+| `pages.yml` | `server.pages` |
+| `contact.yml` | `server.contact` |
+| `privacy.yml` | `server.privacy`, `server.compliance`, `server.tracking` |
+| `security.yml` | `server.security`, `server.rate_limit`, `server.geoip`, `server.limits`, `server.tokens`, `data.*` |
+| `logs.yml` | `server.logs` |
+| `metrics.yml` | `server.metrics` |
+| `notifications.yml` | `server.notifications` |
+| `tor.yml` | `server.tor` and legacy top-level `tor` |
+| `i2p.yml` | `server.i2p` |
+| `maintenance.yml` | `server.maintenance`, `server.scheduler`, `server.update`, `server.auto_update`, `server.backup`, `server.restore`, top-level `cli` |
+| `accounts.yml` | `server.auth`, `server.users`, `server.orgs`, `server.session`, `server.admin`, `server.admin_path` |
+| `app.yml` | Other project-defined sections |
+
+On startup, legacy `server.yml` and drop-in settings in the wrong owner file
+are moved to their canonical area file. Existing canonical owner values win
+collisions. The original `server.yml` is copied to `server.yml.bak` (mode
+`0600`) before area files are atomically written; then `server.yml` is
+rewritten with its fixed node-local header. Migration does not change or
+revalidate values. If the configuration directory cannot be written, the
+migration is skipped and the merged settings remain active.
 
 `server.restore` limits untrusted backup extraction:
 

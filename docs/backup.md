@@ -74,6 +74,20 @@ settings intact, and cannot be reused.
 
 ## Retention
 
+The policy lives at `server.backup.retention` in the merged configuration
+(stored in `yaml.d/maintenance.yml` after area migration):
+
+```yaml
+server:
+  backup:
+    retention:
+      max_backups: 1
+      keep_weekly: 0
+      keep_monthly: 0
+      keep_yearly: 0
+      max_total_size: "10%"
+```
+
 Full backups are assigned to one exclusive retention bucket: January 1st,
 other first-of-month dates, Sundays, then all remaining dates. Incrementals
 are excluded from count limits and replaced by later runs. A retained
@@ -82,8 +96,7 @@ cap considers all backup files; if it cannot be met without deleting a
 protected base, the cap remains exceeded and a warning is logged.
 
 The authenticated admin panel at `/server/{admin_path}/backup` can create a
-manual backup, list archives, verify an archive, delete an archive, and
-download an archive as a no-store attachment. It refuses to delete a full
-backup that a retained incremental needs. Restore and backup policy editing
-are not yet exposed in the panel; use the maintenance restore command for
-restores.
+manual backup, list archives and total storage, verify an archive, restore an
+archive, delete an archive, and download an archive as a no-store attachment.
+It refuses to delete a full backup that a retained incremental needs. Backup
+policy editing is not yet exposed in the panel.

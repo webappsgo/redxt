@@ -144,6 +144,8 @@ admin scope. User- and organization-scoped agent routes are not available yet.
 | GET | `/api/{api_version}/users/sessions` | Bearer token or session | List the current user's sessions. |
 | DELETE | `/api/{api_version}/users/sessions/{session_id}` | Bearer token or session | Revoke a session. |
 | GET, POST | `/api/{api_version}/users/tokens` | Bearer token or session for GET; session for POST | List or issue API tokens. |
+| GET | `/api/{api_version}/users/tokens/{token_id}` | Bearer token or session | Read token metadata without returning its secret or hash. |
+| POST | `/api/{api_version}/users/tokens/{token_id}/rotate` | Session | Replace the token secret, preserve its settings, and return the new secret once with `Cache-Control: no-store`. |
 | DELETE | `/api/{api_version}/users/tokens/{token_id}` | Session | Revoke an API token. |
 | POST | `/api/{api_version}/users/invites/{code}` | Session | Accept an organization invitation. |
 | GET | `/api/{api_version}/users/{username}` | Public | Read a public user profile. |

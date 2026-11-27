@@ -37,6 +37,14 @@ complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
 - Companion `redxt-cli` and `redxt-agent` binaries are part of the required
   project deliverables; see the backlog for incomplete behavior
 
+## Supported Languages
+
+All server, CLI, and agent binaries include the same eight locales: English
+(`en`), Spanish (`es`), Chinese (`zh`), French (`fr`), Arabic (`ar`), German
+(`de`), Italian (`it`), and Japanese (`ja`). Arabic uses a right-to-left
+interface. See the [translation guide](docs/translating.md) to contribute a
+translation.
+
 The project is not yet a replacement for a production DNS stack. Review the
 current feature status before deploying it.
 
@@ -81,8 +89,10 @@ implemented API surface.
 
 - [Installation](docs/installation.md)
 - [API reference](docs/api.md)
+- [Backup and restore](docs/backup.md)
 - [Security](docs/security.md)
 - [Integrations](docs/integrations.md)
+- [Translating](docs/translating.md)
 - [Implementation backlog](TODO.AI.md)
 
 ## Development

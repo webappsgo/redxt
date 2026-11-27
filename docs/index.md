@@ -49,11 +49,13 @@ and API behavior.
 - [Configuration](configuration.md)
 - [API Reference](api.md)
 - [CLI Reference](cli.md)
+- [Backup and Restore](backup.md)
 - [Admin Panel](admin.md)
 - [Web app and offline behavior](web-app.md)
 - [Security](security.md)
 - [Integrations](integrations.md)
 - [Development](development.md)
+- [Translating](translating.md)
 
 ## Links
 

@@ -113,6 +113,8 @@ Markdown text.
 |---|---|---|---|
 | GET, PATCH | `/api/{api_version}/server/{admin_path}/ssl` | Bearer operator token or stored Server Admin token | Read or update SSL/TLS and ACME settings. DNS credential values are write-only. |
 | POST | `/api/{api_version}/server/{admin_path}/ssl/renew` | Global-scope Bearer operator or Server Admin token | Force renewal of managed ACME certificates. |
+| GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | Bearer token owned by that Server Admin | Read the caller's username, account email, and OpenPGP public key; other admins are not visible. |
+| PATCH | `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | Non-read-only Bearer token owned by that Server Admin | Update the caller's username or set/clear its validated OpenPGP public key. Username changes use the admin reserved-name and route-collision checks. Icon updates remain unimplemented. |
 | GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Bearer token owned by that Server Admin | Read the default token's prefix and mask. |
 | POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Global-scope Bearer token owned by that Server Admin | Replace the default token and return the new `adm_` value once. |
 | GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata, including whether an active token has reached the configured rotation reminder age; secrets and hashes are never returned. |
@@ -244,8 +246,13 @@ and `record_count`. The challenge value is returned once and encrypted at
 rest. Imported records are normalized to DNS presentation data; comments and
 source formatting are not retained.
 
-Content negotiation is honored on every route (`Accept:
-application/json`, `text/plain`, `text/html` where applicable).
+Versioned REST endpoints default to JSON. `Accept: application/json` takes
+priority over client detection; `Accept: text/plain`, detected HTTP tools, and
+the `.txt` suffix select the API's plain-text serializer. A declared binary
+route keeps its bytes and media type for every `Accept` value, and its `.txt`
+form is `404`. Health, GraphQL, Swagger, autodiscovery, and MCP retain their
+endpoint-specific response contracts; the remaining API negotiation coverage
+is tracked in `TODO.AI.md`.
 
 ## DNS-over-HTTPS
 

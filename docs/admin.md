@@ -52,6 +52,12 @@ own preferences. Pages require an authenticated Server Admin session; a
 Regular User is redirected to their own account area. An administrator can
 only read or update their own preference page.
 
+Each Server Admin can register an OpenPGP public key at
+`/server/{admin_path}/{admin_username}/profile/security/pgp` for encrypted
+coordinated-disclosure notifications. The matching bearer API profile GET
+returns that admin's key; PATCH accepts `pgp_public_key`, validates that it is
+public-key material, and only updates the token owner's own profile.
+
 The Email page at `/server/{admin_path}/email` edits SMTP host, port,
 credentials, TLS mode, and sender identity. SMTP passwords are never shown
 after saving and are persisted through the protected secrets file. The test
@@ -151,3 +157,10 @@ unavailable in the panel/API. The wider settings, audit, and cluster surfaces
 remain incomplete. The browser UI is server-rendered
 and its forms work without JavaScript; clipboard support for one-time tokens is
 an optional enhancement.
+
+Admin REST routes default to JSON. `Accept: text/plain`, a detected HTTP tool,
+or a `.txt` suffix returns the shared plain-text API representation; an
+explicit `Accept: application/json` takes priority over client detection. An
+authorized `.txt` request for a backup download returns `404`; an unauthenticated
+request keeps its authentication error. Ordinary backup downloads retain their
+binary media type and bytes for every `Accept` value.

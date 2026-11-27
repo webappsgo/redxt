@@ -17,16 +17,17 @@ platforms (linux/darwin/windows/freebsd × amd64/arm64) inside the
 `casjaysdev/go:latest` toolchain container, with `CGO_ENABLED=0` and
 version/commit/build-date stamped via `-ldflags`.
 
-## Run Locally
+## Local Binary Checks
 
 ```bash
-make dev
+make test
 ```
 
-Builds the server, CLI, and agent (when present) inside the Go toolchain
-container and writes them to a unique directory under
-`${TMPDIR:-/tmp}/webappsgo/redxt-*`. It does not start a server or a Compose
-stack. Run the generated server binary to exercise it locally.
+Runs the quality gates and unit tests in the Go toolchain container, then
+builds the debug binaries and checks them in an isolated Alpine container.
+Use `make build` when you need the local debug binary and all eight platform
+artifacts without running the checks. The server, CLI, and agent are not run
+directly on the development host.
 
 The development Compose stack is a separate manual workflow. Copy
 `docker/docker-compose.dev.yml` into an isolated runtime directory and run
@@ -35,23 +36,16 @@ the source checkout. See the Docker volume rules in `AI.md` PART 27.
 
 ## Testing
 
-Two phases:
+`make test` runs the quality gates (`go vet`, `staticcheck`,
+`govulncheck`, shell lint and formatting), the Go unit tests with the
+coverage threshold, and the basic binary checks in `tests/run_tests.sh`.
+The binary checks build through `make build` and run the binaries in a
+disposable Docker container.
 
-1. **Unit tests** — `make test` runs `go test -v -cover ./...` inside
-   Docker and enforces at least 60% total statement coverage. CI runs
-   `go vet`, `staticcheck`, and `govulncheck` as separate gates.
-2. **Binary smoke tests** — `./tests/run_tests.sh` runs the Docker
-   Alpine tier. It builds the binaries with `make build`, starts the
-   server, and checks version/help, public health endpoints, browser
-   admin gating, binary rename behavior, and CLI health. The Incus
-   service-lifecycle suite is separate and must be invoked explicitly
-   with `./tests/incus.sh`; it is not selected by `run_tests.sh`.
-3. **Browser E2E tests** — `./tests/e2e.sh` is a separate manual tier
-   against a running server. It is not part of `run_tests.sh`.
-
-The current binary smoke suite does not yet implement the full PART 29
-operator setup, authenticated CRUD, Tor/I2P, and agent workflows. See
-`TODO.AI.md` before treating those behaviors as covered.
+The full systemd/OpenRC lifecycle checks are run explicitly with
+`./tests/incus.sh`; clean-OS VM checks use `./tests/virt.sh` when Incus VM
+support is available. Browser end-to-end tests use `./tests/e2e.sh`.
+These tiers are separate from the commit gate.
 
 ## Contributing
 

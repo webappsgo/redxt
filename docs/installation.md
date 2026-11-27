@@ -30,11 +30,12 @@ the stack and remove only that generated temporary directory when finished.
 
 Release binaries are not yet published. Release builds are intended to
 cover all 8 target platforms (linux/darwin/windows/freebsd × amd64/arm64).
-For local development builds, use the Docker-based workflow in
-[`development.md`](development.md).
+Build local and cross-platform binaries with `make build`; use the local
+binary from `binaries/` for a systemd installation.
 
 ```bash
-./redxt-linux-amd64 --config server.yml
+make build
+binaries/redxt --config /etc/redxt
 ```
 
 The server binary is designed to run without external runtime
@@ -46,8 +47,8 @@ Running as a dedicated system user avoids permanent root. Escalation is
 required only once, to install the service and bind privileged ports:
 
 ```bash
-make local
-sudo ./binaries/redxt --service --install
+make build
+sudo ./binaries/redxt --config /etc/redxt --service --install
 sudo systemctl start redxt
 sudo systemctl status redxt
 ```

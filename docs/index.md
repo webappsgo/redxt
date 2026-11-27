@@ -49,6 +49,7 @@ for the product requirements.
 - [API Reference](api.md)
 - [CLI Reference](cli.md)
 - [Admin Panel](admin.md)
+- [Web app and offline behavior](web-app.md)
 - [Security](security.md)
 - [Integrations](integrations.md)
 - [Development](development.md)

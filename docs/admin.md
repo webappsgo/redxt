@@ -80,11 +80,16 @@ panel and live at `/server/preferences`. This path is reserved and cannot
 be configured as the admin path.
 
 The backup page supports manual creation, listing, archive verification,
-deletion with incremental-base protection, and archive downloads. The bearer
-API at `/api/{api_version}/server/{admin_path}/backup` supports archive listing
-and creation, metadata lookup, deletion, and download; mutations require a
-global-scope token. Restore and backup policy editing remain unavailable in the
-panel/API. The wider settings, audit, update, cluster, and agent management
-surfaces remain incomplete. The browser UI is server-rendered and its forms
-work without JavaScript; clipboard support for one-time tokens is an optional
-enhancement.
+restore, deletion with incremental-base protection, and archive downloads.
+Restore requires the typed confirmation `RESTORE`; encrypted archives also
+require their password. A successful restore drains the current server and
+exits with the service restart code after returning its response. The bearer
+API at `/api/{api_version}/server/{admin_path}/backup` supports archive listing,
+creation, metadata lookup, deletion, and download. `POST
+/api/{api_version}/server/{admin_path}/backup/restore` accepts `backup_file` and
+an optional `password`; it requires a global-scope token and requests the same
+graceful restart after the restore completes. Backup policy editing remains
+unavailable in the panel/API. The wider settings, audit, update, cluster, and
+agent management surfaces remain incomplete. The browser UI is server-rendered
+and its forms work without JavaScript; clipboard support for one-time tokens is
+an optional enhancement.

@@ -64,8 +64,11 @@ The target's operator token is kept when one exists. Otherwise restore creates
 a new operator token and prints it once. A restore onto an empty database also
 prints a one-time setup token and stores only its SHA-256 hash in the restored
 server database. The CLI token is prepared for the new-server Primary Admin
-re-authentication flow; the server-side flow that accepts it while preserving
-the restored admin credentials is still outstanding.
+re-authentication flow. After the restored server starts, open
+`/server/administration/setup?reauth=1` (replace `administration` if
+`server.admin_path` is customized), enter the token, and continue. The token
+creates a session for the preserved Primary Admin, leaves its credentials and
+settings intact, and cannot be reused.
 
 ## Retention
 

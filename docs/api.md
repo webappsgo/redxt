@@ -84,6 +84,7 @@ Markdown text.
 | DELETE | `/api/{api_version}/server/{admin_path}/security/tokens/{id}` | Global-scope Bearer operator or Server Admin token | Revoke a token while retaining its audit history. |
 | POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
 | GET, POST | `/api/{api_version}/server/{admin_path}/backup` | Bearer Server Admin token for GET; global-scope token for POST | List archive metadata or create and verify a manual backup. |
+| POST | `/api/{api_version}/server/{admin_path}/backup/restore` | Global-scope Bearer operator or Server Admin token | Restore a named archive after verification; accepts `backup_file` and, when encrypted, `password`, then gracefully exits for service-manager restart. |
 | GET, DELETE | `/api/{api_version}/server/{admin_path}/backup/{id}` | Bearer Server Admin token for GET; global-scope token for DELETE | Read archive metadata or delete an archive; deletion of a retained incremental base returns a conflict. |
 | GET | `/api/{api_version}/server/{admin_path}/backup/{id}/download` | Bearer Server Admin token | Download the archive with private no-store caching. |
 
@@ -94,8 +95,9 @@ stored hashes; rotate responses use `Cache-Control: no-store`.
 Backup creation accepts a JSON object with optional `filename`, `password`,
 `include_ssl`, and `include_data` fields. An omitted password uses the
 configured backup encryption password. Responses expose archive metadata only,
-never an on-disk path or checksum. Restore remains available through the
-maintenance command and is not yet exposed through the admin API.
+never an on-disk path or checksum. Restore accepts `{"backup_file":"...",
+"password":"..."}`; an encrypted archive without a password returns
+`VALIDATION_FAILED`.
 
 #### Users and credentials
 

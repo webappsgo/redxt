@@ -66,7 +66,8 @@ Current server endpoints include:
 - Versioned health: `GET https://redxt.us/api/v1/server/healthz`
 - Privacy details: `GET https://redxt.us/api/v1/server/privacy`
 - Public pages: `/`, `/server/about`, `/server/help`, `/server/privacy`, and
-  `/server/preferences`
+  `/server/preferences`; the preferences page links to stateless cross-device
+  export/import at `/server/preferences/sync`
 - DNS-over-HTTPS: `GET https://redxt.us/dns-query?dns={base64url-message}`
   or `POST https://redxt.us/dns-query` with `Content-Type: application/dns-message`
 - DNS-over-TLS and DNS-over-QUIC: dedicated listeners on configured DNS

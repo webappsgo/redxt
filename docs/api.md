@@ -51,11 +51,25 @@ effective deployment privacy settings. Its consent form posts to
 the `POST /server/ccpa` opt-out control. The preferences page includes consent
 and CCPA toggles, consent-gated theme/language choices, and a guest-cookie reset
 that clears browser storage. These browser forms require the double-submit
-CSRF token. The preference sync page and its API mirrors are not implemented.
+CSRF token. The sync page exports a canonical share URL and unpadded base64url
+code, and imports links, query strings, or codes without storing preferences on
+the server. Import is additive and writes cookies only when that browser has
+accepted Preferences consent.
 
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |
+| GET | `/api/{api_version}/server/preferences/sync` | Public | Export guest preferences with a canonical share URL and short code. |
+| GET | `/api/{api_version}/server/preferences/sync/import` | Public | Import guest preference cookies from direct query values or a shared `code`. |
+| POST | `/api/{api_version}/server/preferences` | Public | Apply a partial guest preference update from JSON or form fields. |
+
+The matching server-rendered routes are `GET /server/preferences/sync`,
+`POST /server/preferences/sync`, and `GET /server/preferences/sync/import`.
+The sync page negotiates HTML, plain text, and JSON; web import and save
+always redirect with `303` and no response body. API save returns
+`400 VALIDATION_FAILED` only when none of the supplied values pass validation.
+`theme`, `lang`, and `redxt_pref_*` values are portable; consent, CCPA, build,
+session, CSRF, and other credential cookies are never exported or imported.
 
 The privacy response is derived from `yaml.d/privacy.yml` (the effective
 `server.privacy` configuration). The `ccpa` object is present only when

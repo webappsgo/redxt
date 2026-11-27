@@ -48,6 +48,18 @@ own preferences. Pages require an authenticated Server Admin session; a
 Regular User is redirected to their own account area. An administrator can
 only read or update their own preference page.
 
+## Database maintenance dashboard
+
+If either database cannot be opened or checked during startup, the usual
+database-backed admin panel is unavailable. The configured admin path still
+serves a read-only maintenance dashboard with the retry count, next attempt,
+and general recovery checks. It does not display credentials or raw database
+errors. State-changing requests receive HTTP 503 with the canonical
+`MAINTENANCE` error and `Retry-After` header; the health endpoint also returns
+503 until recovery succeeds. The dashboard does not provide database repair
+controls, so operators must resolve the database or storage issue at the
+service or configuration level.
+
 The bearer-authenticated SSL API is available at
 `/api/{api_version}/server/{admin_path}/ssl` (`GET` and `PATCH`) and
 `/api/{api_version}/server/{admin_path}/ssl/renew` (`POST`). It accepts the

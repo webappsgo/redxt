@@ -103,6 +103,32 @@ Invalid non-positive values fall back to these defaults with a configuration
 warning. Each archive is checked before it is read and each entry is bounded
 while streaming from the tar reader.
 
+## Maintenance Recovery
+
+`server.maintenance` is stored in `yaml.d/maintenance.yml`.
+
+| Setting | Default | Purpose |
+|---|---:|---|
+| `self_healing.retry_interval` | `30s` | Delay between background recovery attempts |
+| `self_healing.max_attempts` | `0` | Retry limit; zero retries without a limit |
+| `cleanup.disk_threshold` | `90` | Disk usage percentage that triggers cleanup |
+| `cleanup.log_retention_days` | `7` | Age after which maintenance cleanup may remove logs |
+| `notify.on_enter` | `true` | Send a notification when maintenance begins |
+| `notify.on_exit` | `true` | Send a notification when maintenance ends |
+
+Invalid retry intervals, limits, and cleanup thresholds are replaced by their
+defaults and recorded as configuration warnings.
+
+When the server cannot open or validate either database during startup, it
+enters read-only maintenance mode and keeps the HTTP listener and health
+endpoint available. The dashboard at `/server/{admin_path}` shows the retry
+state and general database recovery checks without exposing configured
+credentials or internal connection errors. Health reports HTTP 503 and
+`status: maintenance` until both database schemas are available; successful
+recovery resumes database-backed services and removes the dashboard. A
+positive `self_healing.max_attempts` stops retries at that limit; correcting
+the database and restarting the server begins a new recovery cycle.
+
 ## Browser CSRF
 
 The double-submit CSRF cookie is controlled by `server.csrf` in the merged

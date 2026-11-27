@@ -35,7 +35,9 @@ The current admin panel provides the first-run setup wizard, dashboard,
 application name and tagline settings, editable SSL/TLS and ACME settings at
 `/server/{admin_path}/ssl`, Server Admin API token management at
 `/server/{admin_path}/security/tokens`, server information, theme choice, per-admin
-appearance preferences, and logout. The SSL/TLS form includes the complete
+appearance preferences, scheduler controls, log viewer, email delivery
+settings, and logout. The
+SSL/TLS form includes the complete
 lego DNS provider list and a free-form `VARIABLE=value` credential editor;
 credential values are never returned to the page. Operators can set certificate
 and private-key paths or upload a matching PEM pair; uploaded files are stored
@@ -47,6 +49,31 @@ font size, reduced motion, date format, and time format in the administrator's
 own preferences. Pages require an authenticated Server Admin session; a
 Regular User is redirected to their own account area. An administrator can
 only read or update their own preference page.
+
+The Email page at `/server/{admin_path}/email` edits SMTP host, port,
+credentials, TLS mode, and sender identity. SMTP passwords are never shown
+after saving and are persisted through the protected secrets file. The test
+action sends a message to the signed-in administrator's email address.
+`/server/{admin_path}/email/templates` lists embedded and customized message
+templates. Each editor supports server-rendered preview, validation, sending a
+sample test message to a chosen address (recorded in the audit log), saving a
+custom template, and restoring its embedded default.
+
+The scheduler page at `/server/{admin_path}/scheduler` lists registered
+internal tasks, their schedules, enabled state, last run, and next run. A
+Server Admin can choose an hourly, daily, weekly, monthly, or custom schedule,
+enable or disable a task, inspect its recent run history, and trigger it
+immediately. Schedule edits update the live scheduler and persist for the next
+restart. Manual runs are started asynchronously and remain available when a
+task's regular schedule is disabled.
+
+The log viewer at `/server/{admin_path}/logs` filters the configured Access,
+Error, Audit, Security, and (when enabled) Debug logs by text, selects the
+last 100, 500, or 1,000 matching entries, displays them with pagination, and
+supports download. It can clear
+any selected log except Audit; the audit log is append-only and may be removed
+only by its configured rotation policy. Auto-refresh reloads the current view
+every 15 seconds when enabled.
 
 ## Database maintenance dashboard
 

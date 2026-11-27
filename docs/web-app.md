@@ -9,6 +9,12 @@ application name and tagline, the project description and implemented feature
 summary, and links to About, Help, and sign-in. The shared navigation exposes
 registration when it is enabled and account pages after sign-in.
 
+The Help hub links to `/server/help/mcp`, which documents the resolved
+Streamable HTTP endpoint, token setup, client connection examples, and the
+live tools available to a standard token. The project-specific examples and
+tool guidance are stored in `server.pages.help.mcp` in `yaml.d/pages.yml` and
+can be edited by a Server Admin under Pages → Help.
+
 ## Preferences, consent, and sync
 
 Guest appearance and language settings live at `/server/preferences` and are

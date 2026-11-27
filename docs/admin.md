@@ -37,7 +37,9 @@ application name and tagline settings, editable SSL/TLS and ACME settings at
 `/server/{admin_path}/security/tokens`, server information, theme choice, per-admin
 appearance preferences, scheduler controls, log viewer, email delivery
 settings, update controls, and logout. The
-SSL/TLS form includes the complete
+Pages → Help editor at `/server/{admin_path}/pages/help` updates the public
+MCP guide stored in `server.pages.help.mcp` under `yaml.d/pages.yml`.
+The SSL/TLS form includes the complete
 lego DNS provider list and a free-form `VARIABLE=value` credential editor;
 credential values are never returned to the page. Operators can set certificate
 and private-key paths or upload a matching PEM pair; uploaded files are stored

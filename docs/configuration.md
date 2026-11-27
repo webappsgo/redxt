@@ -75,6 +75,10 @@ for their section:
 | `logs.yml` | `server.logs` |
 | `metrics.yml` | `server.metrics` |
 | `notifications.yml` | `server.notifications` |
+
+`server.pages.help.mcp` stores the Markdown expansion shown in the public MCP
+help page. Server Admins can edit it in Pages → Help; saving writes the
+canonical `yaml.d/pages.yml` area file.
 | `tor.yml` | `server.tor` and legacy top-level `tor` |
 | `i2p.yml` | `server.i2p` |
 | `maintenance.yml` | `server.maintenance`, `server.scheduler`, `server.update`, `server.auto_update`, `server.backup`, `server.restore`, top-level `cli` |

@@ -59,6 +59,7 @@ accepted Preferences consent.
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |
+| GET | `/api/{api_version}/server/preferences` | Public | Read the current browser's effective guest theme, language, and application preferences. |
 | GET | `/api/{api_version}/server/preferences/sync` | Public | Export guest preferences with a canonical share URL and short code. |
 | GET | `/api/{api_version}/server/preferences/sync/import` | Public | Import guest preference cookies from direct query values or a shared `code`. |
 | POST | `/api/{api_version}/server/preferences` | Public | Apply a partial guest preference update from JSON or form fields. |

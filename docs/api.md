@@ -141,7 +141,11 @@ Backup creation accepts a JSON object with optional `filename`, `password`,
 configured backup encryption password. Responses expose archive metadata only,
 never an on-disk path or checksum. Restore accepts `{"backup_file":"...",
 "password":"..."}`; an encrypted archive without a password returns
-`VALIDATION_FAILED`.
+`VALIDATION_FAILED`. `POST /api/{api_version}/server/{admin_path}/backup/test`
+accepts an optional `backup_file` and `password`. With no file it verifies the
+newest full archive plus available daily/hourly incrementals and their bases;
+with a file it verifies that archive and its required base. The response lists
+the result and failed check for each tested archive without exposing paths.
 
 Agent management currently covers CRUD, one-time credential creation,
 registration, heartbeat, metrics reporting, and metric-history queries for the

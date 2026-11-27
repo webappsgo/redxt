@@ -58,6 +58,12 @@ coordinated-disclosure notifications. The matching bearer API profile GET
 returns that admin's key; PATCH accepts `pgp_public_key`, validates that it is
 public-key material, and only updates the token owner's own profile.
 
+The coordinated-disclosure keypair is managed at
+`/server/{admin_path}/security/keypair`. Deletion requires the administrator's
+password and typing `DELETE`; it revokes publication and removes both key
+files. Stored PGP-encrypted reports remain in retention but cannot be
+decrypted after deletion.
+
 The Email page at `/server/{admin_path}/email` edits SMTP host, port,
 credentials, TLS mode, and sender identity. SMTP passwords are never shown
 after saving and are persisted through the protected secrets file. The test
@@ -145,11 +151,14 @@ be configured as the admin path.
 
 The backup page supports manual creation, listing, archive verification,
 restore, deletion with incremental-base protection, and archive downloads.
+Leaving the test selection blank verifies the newest full backup and every
+available daily/hourly incremental with its base; choosing an archive verifies
+only that archive and its required base.
 Restore requires the typed confirmation `RESTORE`; encrypted archives also
 require their password. A successful restore drains the current server and
 exits with the service restart code after returning its response. The bearer
 API at `/api/{api_version}/server/{admin_path}/backup` supports archive listing,
-creation, metadata lookup, deletion, and download. `POST
+creation, metadata lookup, verification, deletion, and download. `POST
 /api/{api_version}/server/{admin_path}/backup/restore` accepts `backup_file` and
 an optional `password`; it requires a global-scope token and requests the same
 graceful restart after the restore completes. Backup policy editing remains

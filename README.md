@@ -26,6 +26,9 @@ complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
 - DNS-over-HTTPS at `/dns-query` on HTTPS, using RFC 8484 GET and POST
 - Configurable DNS-over-TLS and DNS-over-QUIC listeners using the shared
   certificate manager
+- Organization-scoped DNSSEC key generation with encrypted private-key
+  storage and public DS calculation; DNS response signing and validation
+  remain in development
 - Server-rendered setup and administration pages
 - Public landing page at `/`, plus about, help, privacy, and preferences pages with no-JavaScript
   cookie consent, CCPA opt-out controls, and Global Privacy Control handling

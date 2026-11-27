@@ -47,9 +47,11 @@ currently empty.
 are available at `/server/about`, `/server/help`, `/server/privacy`, and
 `/server/preferences`. The privacy page displays the
 effective deployment privacy settings. Its consent form posts to
-`POST /server/consent`; when data sale is enabled, the page and preferences
-page provide a `POST /server/ccpa` opt-out control. These browser forms require
-the double-submit CSRF token.
+`POST /server/consent`; when data sale is enabled, the privacy page provides
+the `POST /server/ccpa` opt-out control. The preferences page includes consent
+and CCPA toggles, consent-gated theme/language choices, and a guest-cookie reset
+that clears browser storage. These browser forms require the double-submit
+CSRF token. The preference sync page and its API mirrors are not implemented.
 
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
@@ -148,6 +150,9 @@ admin scope. User- and organization-scoped agent routes are not available yet.
 | DELETE | `/api/{api_version}/orgs/{slug}/tokens/{token_id}` | Organization admin or owner | Revoke an organization token. |
 | GET, POST | `/api/{api_version}/orgs/{slug}/zones` | Organization member for GET; admin or owner for POST | List or create DNS zones. Creation returns a pending zone and a one-time `_verify.<zone>` TXT challenge. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization member | Read a DNS zone. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec` | Organization member | Read DNSSEC zone settings, public signing-key metadata, and SHA-256 DS records. |
+| GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/keys` | Organization member | List public signing-key metadata. |
+| POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/dnssec/keys` | Organization admin or owner | Generate an encrypted-at-rest ECDSA P-256, ECDSA P-384, or Ed25519 signing key for an active DNSSEC-enabled zone. |
 | GET | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/export` | Organization member | Download the zone and records as BIND (default), JSON, or CSV. |
 | POST | `/api/{api_version}/orgs/{slug}/zones/import` | Organization admin or owner | Import a BIND master file; returns a pending zone, one-time verification challenge, and record count. |
 | PATCH, DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}` | Organization admin or owner | Update or delete a DNS zone. |
@@ -158,6 +163,11 @@ admin scope. User- and organization-scoped agent routes are not available yet.
 | DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/records/{record_id}` | Organization admin or owner | Delete a DNS record. |
 | POST | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/grants` | Organization admin or owner | Grant a member access to a zone. |
 | DELETE | `/api/{api_version}/orgs/{slug}/zones/{zone_id}/grants/{member_id}` | Organization admin or owner | Revoke a member's zone grant. |
+
+DNSSEC key management currently stores encrypted private signing keys and
+returns public DNSKEY metadata. It does not yet sign authoritative DNS
+responses, publish DNSKEY/DS records, or automate rollovers; those operations
+must not be treated as complete DNSSEC service.
 | GET, POST | `/api/{api_version}/orgs/{slug}/domains` | Organization member for GET; elevated role for POST | List or add custom domains. |
 | PATCH, DELETE | `/api/{api_version}/orgs/{slug}/domains/{domain_id}` | Organization admin or owner | Update or remove a custom domain. |
 | GET | `/api/{api_version}/orgs/{slug}/domains/{domain_id}/verification` | Organization member | Read domain verification instructions. |

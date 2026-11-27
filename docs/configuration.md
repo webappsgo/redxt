@@ -269,3 +269,15 @@ served under `/server/{admin_path}`. It must be 2–32 lowercase letters,
 numbers, or interior hyphens and cannot use a reserved server route such as
 `api`, `health`, `about`, `privacy`, `security`, or `preferences`. An invalid
 configured value falls back to `administration`. See [Admin Panel](admin.md).
+
+## Update Channel
+
+`server.update.branch` selects `stable` (default), `beta`, or `devel`.
+Channels are cumulative: beta includes stable releases, and devel includes
+stable, beta, and the rolling `devel` release. The legacy values `daily`,
+`rolling`, `dev`, and `development` are accepted and normalized to `devel`.
+`server.update.auto_install` defaults to `false`; scheduled checks notify about
+eligible releases without replacing the running binary. `server.update.defer_days`
+delays scheduled eligibility by 0–365 days, while a manual update check ignores
+the delay. The CLI can change the canonical setting with
+`redxt --update branch {stable|beta|devel}`.

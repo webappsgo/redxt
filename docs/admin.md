@@ -36,7 +36,7 @@ application name and tagline settings, editable SSL/TLS and ACME settings at
 `/server/{admin_path}/ssl`, Server Admin API token management at
 `/server/{admin_path}/security/tokens`, server information, theme choice, per-admin
 appearance preferences, scheduler controls, log viewer, email delivery
-settings, and logout. The
+settings, update controls, and logout. The
 SSL/TLS form includes the complete
 lego DNS provider list and a free-form `VARIABLE=value` credential editor;
 credential values are never returned to the page. Operators can set certificate
@@ -66,6 +66,13 @@ enable or disable a task, inspect its recent run history, and trigger it
 immediately. Schedule edits update the live scheduler and persist for the next
 restart. Manual runs are started asynchronously and remain available when a
 task's regular schedule is disabled.
+
+The Updates page is available at `/server/{admin_path}/updates`; the singular
+`/update` route is an alias. It stores the release channel, scheduled install
+choice, defer window, and minimum CLI and agent versions. Server Admins can
+check for the latest channel release or explicitly confirm the verified
+install flow, which validates the release checksum before replacing the
+server binary and restarting the service.
 
 The log viewer at `/server/{admin_path}/logs` filters the configured Access,
 Error, Audit, Security, and (when enabled) Debug logs by text, selects the
@@ -128,7 +135,7 @@ creation, metadata lookup, deletion, and download. `POST
 /api/{api_version}/server/{admin_path}/backup/restore` accepts `backup_file` and
 an optional `password`; it requires a global-scope token and requests the same
 graceful restart after the restore completes. Backup policy editing remains
-unavailable in the panel/API. The wider settings, audit, update, cluster, and
+unavailable in the panel/API. The wider settings, audit, cluster, and
 agent management surfaces remain incomplete. The browser UI is server-rendered
 and its forms work without JavaScript; clipboard support for one-time tokens is
 an optional enhancement.

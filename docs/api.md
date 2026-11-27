@@ -107,6 +107,11 @@ Markdown text.
 | POST | `/api/{api_version}/server/auth/password/reset` | Public reset token | Set a password using a reset token. |
 | POST | `/api/{api_version}/server/auth/verify/{code}` | Public | Verify an email address. |
 
+Account lockout responses use `403 ACCOUNT_LOCKED`. Temporary locks include
+`details.retry_after_seconds`; permanent locks include `details.permanent: true`.
+The browser sign-in form shows the remaining wait time or directs the user to
+reset the password or contact an administrator for a permanent lock.
+
 #### Server admin
 
 | Method | Path | Authentication | Purpose |
@@ -114,12 +119,15 @@ Markdown text.
 | GET, PATCH | `/api/{api_version}/server/{admin_path}/ssl` | Bearer operator token or stored Server Admin token | Read or update SSL/TLS and ACME settings. DNS credential values are write-only. |
 | POST | `/api/{api_version}/server/{admin_path}/ssl/renew` | Global-scope Bearer operator or Server Admin token | Force renewal of managed ACME certificates. |
 | GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | Bearer token owned by that Server Admin | Read the caller's username, account email, and OpenPGP public key; other admins are not visible. |
-| PATCH | `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | Non-read-only Bearer token owned by that Server Admin | Update the caller's username or set/clear its validated OpenPGP public key. Username changes use the admin reserved-name and route-collision checks. Icon updates remain unimplemented. |
+| PATCH | `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | Non-read-only Bearer token owned by that Server Admin | Update the caller's username or set/clear its validated OpenPGP public key. Username changes use the admin reserved-name and route-collision checks. |
+| POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/password` | Non-read-only Bearer token owned by that Server Admin | Change the caller's password after verifying `current_password`; `new_password` follows `server.security.password`. Existing browser sessions are revoked, the CSRF secret rotates, and the action is audited. |
 | GET | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Bearer token owned by that Server Admin | Read the default token's prefix and mask. |
 | POST | `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | Global-scope Bearer token owned by that Server Admin | Replace the default token and return the new `adm_` value once. |
 | GET | `/api/{api_version}/server/{admin_path}/security/tokens` | Bearer operator or stored Server Admin token | List all token metadata, including whether an active token has reached the configured rotation reminder age; secrets and hashes are never returned. |
 | DELETE | `/api/{api_version}/server/{admin_path}/security/tokens/{id}` | Global-scope Bearer operator or Server Admin token | Revoke a token while retaining its audit history. |
 | POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
+| GET | `/api/{api_version}/server/{admin_path}/security/locked-accounts` | Bearer operator or Server Admin token | List accounts with an active temporary or permanent lock, including account kind, numeric ID, expiry, and permanent-lock state. |
+| DELETE | `/api/{api_version}/server/{admin_path}/security/locked-accounts/{kind}/{id}` | Global-scope Bearer operator or Server Admin token | Clear a user's or admin's lockout state and failure history; `kind` is `user` or `admin`. |
 | GET, POST | `/api/{api_version}/server/{admin_path}/agents` | Bearer operator or stored Server Admin token | List admin-scoped agents or create a registration token. POST accepts `name` and optional `tags`; the new `adm_` token is shown once and expires after 24 hours until registration. |
 | POST | `/api/{api_version}/server/{admin_path}/agents/register` | Admin agent token (`adm_`, scope `agent`) | Register the pending agent once with hostname, OS, architecture, version, tags, and optional display name. |
 | POST | `/api/{api_version}/server/{admin_path}/agents/heartbeat` | Registered admin agent token | Update liveness, IP address, uptime, version, and update availability. |

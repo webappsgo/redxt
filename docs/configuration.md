@@ -107,6 +107,16 @@ Invalid non-positive values fall back to these defaults with a configuration
 warning. Each archive is checked before it is read and each entry is bounded
 while streaming from the tar reader.
 
+`server.compliance` lists enabled regulatory standards. All are disabled by
+default. Enabling HIPAA, SOC 2, or PCI-DSS raises the effective shared password
+policy to at least 12 characters, uppercase, number, special character, 90 day
+maximum age, and 12 remembered passwords. Account creation and password changes
+currently enforce the length and composition requirements; password expiry and
+history are not enforced yet.
+
+`server.security.password` configures the shared password length and composition
+requirements. Its default is 8 characters with no extra composition classes.
+
 ## Maintenance Recovery
 
 `server.maintenance` is stored in `yaml.d/maintenance.yml`.

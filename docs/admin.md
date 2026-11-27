@@ -52,6 +52,12 @@ own preferences. Pages require an authenticated Server Admin session; a
 Regular User is redirected to their own account area. An administrator can
 only read or update their own preference page.
 
+The own-profile page at `/server/{admin_path}/{admin_username}/profile` supports
+routine password changes. The current password is required, and the new password
+must satisfy `server.security.password`. A successful change revokes existing
+browser sessions, rotates the CSRF secret with a one-hour grace period, records
+`admin.password_changed`, and returns the browser to the shared sign-in page.
+
 Each Server Admin can register an OpenPGP public key at
 `/server/{admin_path}/{admin_username}/profile/security/pgp` for encrypted
 coordinated-disclosure notifications. The matching bearer API profile GET
@@ -60,9 +66,19 @@ public-key material, and only updates the token owner's own profile.
 
 The coordinated-disclosure keypair is managed at
 `/server/{admin_path}/security/keypair`. Deletion requires the administrator's
-password and typing `DELETE`; it revokes publication and removes both key
+password and typing `DELETE PGP KEY`; it revokes publication and removes both key
 files. Stored PGP-encrypted reports remain in retention but cannot be
 decrypted after deletion.
+
+The Security → Locked accounts page at
+`/server/{admin_path}/security/locked-accounts` lists active temporary and
+permanent lockouts for Regular Users and Server Admins. Admins can clear any
+listed lockout; clearing also removes its rolling failure history. The shared
+defaults lock an account after 5 failures in 15 minutes for 15 minutes, after
+10 failures in an hour for one hour, and permanently after 15 failures in 24
+hours. Password reset clears a Regular User's lockout history, and allow-listed
+client IPs bypass account lockout tracking. The matching list and unlock API
+routes are documented in [the API reference](api.md).
 
 The Email page at `/server/{admin_path}/email` edits SMTP host, port,
 credentials, TLS mode, and sender identity. SMTP passwords are never shown
@@ -132,6 +148,10 @@ An admin can inspect the masked default API token and replace it at
 generated `adm_` token once and invalidates the previous default token. These
 profile routes require a stored token belonging to the named admin; the
 operator token cannot read or rotate an admin's personal token.
+
+The matching `POST .../profile/password` route accepts
+`{"current_password":"…","new_password":"…"}` from a non-read-only token
+owned by the named admin. It changes only that token owner's password.
 
 The API Tokens page creates `adm_` tokens with global, read-write, or read
 scope and the configured default, Never, preset, or custom expiration. A new token is shown once; the

@@ -40,6 +40,11 @@ DNS-01 is selected, and issuance uses the configured lego provider. The admin
 panel can edit provider settings without returning credential values.
 Issuance status tracking and key-rotation support remain in progress.
 
+The saved backup encryption password is also wrapped as `enc:v1:` with
+AES-256-GCM under `server.security.encryption_key` before it is written to
+`secrets.yml`. Plaintext values from older configuration are migrated after
+the server key is available, then decrypted only in memory for scheduled runs.
+
 On first start, redxt creates `server.token` (`adm_` plus 32 random base62
 characters) and the three `mtr_` metrics tokens, stores them in `secrets.yml`,
 and audits their key names without logging their values. The operator token

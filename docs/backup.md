@@ -12,7 +12,9 @@ Supply `--include-ssl` to include the configured SSL directory and
 `--include-data` to include the data directory. A custom filename and
 `--password` are also accepted. Without a password, the archive is unencrypted
 unless compliance mode blocks the operation. Scheduled backups use the saved
-backup password and do not prompt.
+backup password and do not prompt. The saved password is stored in `secrets.yml`
+as `enc:v1:` AES-256-GCM ciphertext under the server encryption key and is
+decrypted only in memory when a scheduled backup runs.
 
 The archive includes `server.yml`, local `server.db` and `users.db` files,
 `app_secrets.json`, `secrets.yml`, `yaml.d/`, `assets/`, and configured template and theme files

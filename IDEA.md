@@ -228,7 +228,7 @@ Every zone, policy, key, and DDNS host belongs to an organization; every user ge
 | **TSIG key** | Belongs to an org; per-key per-zone grants (update, transfer, notify) with BIND `update-policy` grant semantics; ACME-scoped keys restricted to `_acme-challenge` names |
 | **GSS-TSIG identity** (RFC 3645) | Maps an AD machine/service identity to scoped update grants, for secure dynamic updates from domain-joined Windows clients |
 | **DDNS host token** | Belongs to a user within an org; updates only its own host(s) |
-| **Agent token** (`adm_agt_`/`usr_agt_`/`org_agt_` per spec) | Data-plane enrollment only; no management authority |
+| **Agent token** (an `adm_`, `usr_`, or `org_` token with database scope `agent`) | Data-plane enrollment only; no management authority |
 
 Instance admins, cluster nodes, and anonymous resolver clients have the distinct permissions and access boundaries described below and in AI.md PARTs 17 and 10.
 

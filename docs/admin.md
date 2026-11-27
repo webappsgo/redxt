@@ -4,7 +4,7 @@
 
 The admin panel is isolated under `/server/{admin_path}` — the path
 segment defaults to `administration` but is fully configurable in
-`server.yml`.
+`yaml.d/accounts.yml` (or a merged configuration drop-in).
 
 The path segment must be 2–32 lowercase letters, numbers, or interior
 hyphens. Server routes such as `api`, `health`, `about`, `privacy`,

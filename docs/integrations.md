@@ -1,45 +1,53 @@
 # Integrations
 
-## External Identity
+## Identity providers
 
-External identity providers (OIDC, LDAP, SAML, passkey/WebAuthn) are
-specified but not yet implemented — see `TODO.AI.md`. Local Argon2id
-credentials with TOTP are the only supported sign-in method today.
+The server currently authenticates Server Admins and Regular Users with local
+accounts. Passwords use Argon2id; optional TOTP second-factor authentication
+is supported. External OIDC, LDAP, SAML, and passkey providers are not
+available in this release.
 
-## Discovery & Protocol Endpoints
+## DNS protocols
 
-- REST: `/api/v1/...`
-- DNS-over-HTTPS: `/dns-query` over HTTPS; DNS-over-TLS and DNS-over-QUIC
-  use dedicated encrypted DNS listeners when a certificate is available.
-- Swagger UI: `/server/docs/swagger`, JSON at `/api/v1/server/swagger`
-  (alias `/api/swagger`)
-- GraphiQL: `/server/docs/graphql`, endpoint at
-  `POST /api/v1/server/graphql` (alias `/api/graphql`)
-- Health: `/server/healthz` (root alias `/healthz`,
-  versioned `/api/v1/server/healthz`)
+- Authoritative DNS is available over UDP and TCP on the configured DNS
+  listener.
+- DNS-over-HTTPS uses `/dns-query` over HTTPS and accepts RFC 8484 GET and
+  POST requests.
+- DNS-over-TLS and DNS-over-QUIC use separate configured listeners and
+  require a usable server certificate.
+- BIND master files can be imported for zone provisioning. Zones can be
+  exported as BIND master files, JSON, or CSV.
 
-## Platform Integrations
+Recursive resolution, DNSCrypt, and encrypted upstream transports are not
+available. See [DNS API details](api.md#dns-over-https) and the
+[configuration reference](configuration.md) for listener settings.
 
-- **Terraform provider** — required by `IDEA.md`, but not implemented or
-  published yet.
-- **BIND interchange** — zone import accepts BIND master files, and zone
-  export is available in BIND master format, JSON, and CSV. `named.conf`
-  migration remains unimplemented.
-- **Cluster nodes** — horizontal clustering between redxt instances is a
-  product requirement, but cluster membership and synchronization are not
-  implemented yet. Managed nodes (external DNS/redirect targets) are a
-  separate product concept and are not currently managed by the server.
+## Client and agent discovery
 
-The current management API covers user, organization, custom-domain, and DNS
-zone/record operations, including ownership verification, BIND master-file
-import, and zone export. Provider-compatible DDNS routes and the other DNS
-control-plane surfaces remain unimplemented; see [API Reference](api.md) for
-available routes.
+`GET /api/autodiscover` and `GET /api/v1/` return the same public discovery
+document. It describes the API version, public origins, and minimum supported
+client and agent versions. Overlay addresses are included only when their
+exposure settings are enabled. The document does not expose configuration or
+an API schema.
 
-## Operator Notes
+The server provides a Streamable HTTP MCP endpoint at `/api/v1/server/mcp`,
+with `/api/mcp` and `/mcp` aliases. It uses bearer-token authentication and
+filters tools by token scope. The public guide at `/server/help/mcp` lists the
+active endpoint, connection examples, and available tools.
 
-Overlay network integrations (Tor, I2P) are managed by the server:
-Tor activates automatically when a Tor binary is available. I2P defaults
-off on bare metal and VMs and on in application containers; override its
-default with `server.i2p.enabled` or `I2P_ENABLED`. Neither overlay allows
-relay, exit, or proxy traffic through the redxt process.
+Managed agents register with a one-use token created by a Server Admin and
+report heartbeats and metrics. This is separate from clustering between redxt
+server instances; cluster membership and synchronization are not available.
+See the [Admin Panel guide](admin.md#available-pages) for agent management.
+
+## Other integrations
+
+- Tor hidden-service support activates when Tor is detected. Address
+  publication is controlled by the Tor exposure setting.
+- I2P support is controlled by the resolved I2P configuration; address
+  publication is separately opt-in.
+- The Terraform provider is not currently distributed.
+- No webhook, federation, or external identity-provider integration is
+  enabled by this release.
+
+Neither Tor nor I2P enables relay, exit, or proxy traffic through redxt.

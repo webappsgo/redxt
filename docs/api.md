@@ -37,9 +37,15 @@ document. The `data` object contains `api.current_version`, `name`,
 `version`, public `urls`, CLI and agent version maps, and their minimum
 versions. Onion and I2P addresses appear only when the corresponding
 `server.tor.expose` or `server.i2p.expose` setting is enabled. The endpoint
-does not publish configuration settings or a schema. Release asset inventory
-and binary download routes are not implemented yet, so both version maps are
-currently empty.
+does not publish configuration settings or a schema. It inventories
+operator-provisioned assets from `{data_dir}/cli/` (or
+`cli.binary_download.dir`) and publishes only files whose SHA-256 matches
+`sha256.txt`. Missing files and checksum mismatches are omitted.
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET | `/api/{api_version}/cli/binaries/{project_name}-cli-{os}-{arch}[.exe]` | Public by default; Bearer token when `cli.binary_download.require_auth` is true | Download a verified CLI release binary. |
+| GET | `/api/{api_version}/agent/binaries/{project_name}-agent-{os}-{arch}[.exe]` | Bearer token with `agent` scope | Download a verified agent release binary. |
 
 #### Public server information
 
@@ -107,10 +113,11 @@ Markdown text.
 | POST | `/api/{api_version}/server/auth/password/reset` | Public reset token | Set a password using a reset token. |
 | POST | `/api/{api_version}/server/auth/verify/{code}` | Public | Verify an email address. |
 
-Account lockout responses use `403 ACCOUNT_LOCKED`. Temporary locks include
-`details.retry_after_seconds`; permanent locks include `details.permanent: true`.
-The browser sign-in form shows the remaining wait time or directs the user to
-reset the password or contact an administrator for a permanent lock.
+Account lockout responses use `403 ACCOUNT_LOCKED`. Temporary locks set the
+remaining wait in the HTTP `Retry-After` header; the canonical error body does
+not include retry timing. Permanent locks omit that header. The browser
+sign-in form shows the remaining wait time or directs the user to reset the
+password or contact an administrator for a permanent lock.
 
 #### Server admin
 
@@ -168,9 +175,10 @@ admin scope. User- and organization-scoped agent routes are not available yet.
 | GET | `/api/{api_version}/users/security` | Bearer token or session | Read security settings. |
 | POST | `/api/{api_version}/users/security/password` | Session | Change the password. |
 | POST | `/api/{api_version}/users/security/email` | Session | Change the email address. |
-| POST | `/api/{api_version}/users/security/2fa` | Session | Start two-factor enrollment. |
-| POST | `/api/{api_version}/users/security/2fa/confirm` | Session | Confirm two-factor enrollment. |
-| DELETE | `/api/{api_version}/users/security/2fa` | Session | Disable two-factor authentication. |
+| POST | `/api/{api_version}/users/security/2fa` | Session | Start enrollment after re-entering `current_password`; returns the one-time TOTP seed and provisioning URI. |
+| POST | `/api/{api_version}/users/security/2fa/confirm` | Session | Verify the authenticator code; returns ten recovery keys once and leaves 2FA pending. |
+| POST | `/api/{api_version}/users/security/recovery-keys/ack` | Session | Acknowledge that recovery keys were saved and activate the pending second factor. |
+| POST | `/api/{api_version}/users/security/2fa/disable` | Session | Disable two-factor authentication after password confirmation. |
 | GET | `/api/{api_version}/users/sessions` | Bearer token or session | List the current user's sessions. |
 | DELETE | `/api/{api_version}/users/sessions/{session_id}` | Bearer token or session | Revoke a session. |
 | GET, POST | `/api/{api_version}/users/tokens` | Bearer token or session for GET; session for POST | List or issue API tokens. |

@@ -133,6 +133,13 @@ requirements. Its default is 8 characters with no extra composition classes.
 Invalid retry intervals, limits, and cleanup thresholds are replaced by their
 defaults and recorded as configuration warnings.
 
+CLI and agent releases are operator-provisioned in `{data_dir}/cli/`. The
+directory contains the platform binaries, `version.txt`, and `sha256.txt`;
+the server publishes and streams only binaries whose checksum matches. The
+`cli.binary_download.dir` setting in `yaml.d/maintenance.yml` overrides this
+directory, and `cli.binary_download.require_auth` defaults to `false` for CLI
+downloads. Agent binary downloads always require an agent-scoped Bearer token.
+
 When the server cannot open or validate either database during startup, it
 enters read-only maintenance mode and keeps the HTTP listener and health
 endpoint available. The dashboard at `/server/{admin_path}` shows the retry

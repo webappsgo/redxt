@@ -4,100 +4,59 @@
 [![License](https://img.shields.io/github/license/webappsgo/redxt)](LICENSE.md)
 [![Documentation Status](https://readthedocs.org/projects/webappsgo-redxt/badge/?version=latest)](https://webappsgo-redxt.readthedocs.io/en/latest/?badge=latest)
 
-## About
+redxt is a self-hosted DNS platform. The server provides authoritative DNS
+over UDP/TCP and DNS-over-HTTPS, with DNS-over-TLS and DNS-over-QUIC
+listeners when certificates are configured. It includes server-rendered
+setup, account, organization, DNS zone, and administration pages. The
+repository also provides the `redxt-cli` client and `redxt-agent` companion
+for managed nodes.
 
-redxt is an in-development DNS platform. The current server provides
-authoritative answers for configured primary and secondary zones over DNS
-UDP/TCP and DNS-over-HTTPS, with optional DoT/DoQ listeners when a usable
-certificate is available. The broader product specification includes
-recursive resolution, forwarding, DNS firewall, dynamic DNS, redirects,
-data zones, clustering, and managed agents; those capabilities are not yet
-complete. See [`TODO.AI.md`](TODO.AI.md) for the implementation status and
-[`IDEA.md`](IDEA.md) for the product requirements.
-
-## Official Site
-
-[redxt.us](https://redxt.us)
+On first run, redxt chooses and persists an available high HTTP port, prints
+a one-time setup token, and creates an operator API credential. Use the
+setup token in the setup wizard to create the Primary Admin account. The
+operator API credential is separate and is intended for programmatic
+administration.
 
 ## Features
 
-- Authoritative DNS over UDP and TCP, with configurable listener address
-  and port
-- DNS-over-HTTPS at `/dns-query` on HTTPS, using RFC 8484 GET and POST
-- Configurable DNS-over-TLS and DNS-over-QUIC listeners using the shared
-  certificate manager
-- Organization-scoped DNSSEC key generation with encrypted private-key
-  storage and public DS calculation; DNS response signing and validation
-  remain in development
-- Server-rendered setup and administration pages
-- Public landing page at `/`, plus about, help, privacy, and preferences pages with no-JavaScript
-  cookie consent, CCPA opt-out controls, and Global Privacy Control handling
-- Public versioned privacy API that reports the effective privacy settings
-- Health endpoints for monitoring the current server
-- Companion `redxt-cli` and `redxt-agent` binaries are part of the required
-  project deliverables; see the backlog for incomplete behavior
+- Authoritative DNS over UDP and TCP, plus RFC 8484 DNS-over-HTTPS
+- DNS-over-TLS and DNS-over-QUIC listeners with configured certificates
+- Server-rendered public, account, organization, setup, and administration
+  pages, with forms that work without JavaScript
+- Organization zone and record management, domain verification, and API
+  tokens
+- Backup administration and installable PWA support
+- Companion `redxt-cli` and `redxt-agent` binaries
 
-## Supported Languages
+See the [documentation](https://webappsgo-redxt.readthedocs.io/) for
+installation, configuration, API, client, server pages, security, and
+operations.
 
-All server, CLI, and agent binaries include the same eight locales: English
-(`en`), Spanish (`es`), Chinese (`zh`), French (`fr`), Arabic (`ar`), German
-(`de`), Italian (`it`), and Japanese (`ja`). Arabic uses a right-to-left
-interface. See the [translation guide](docs/translating.md) to contribute a
-translation.
+## Quick Start
 
-The project is not yet a replacement for a production DNS stack. Review the
-current feature status before deploying it.
+Build binaries with the project Docker toolchain or use the Docker image.
+See the [installation guide](docs/installation.md) for Docker, binary, and
+service setup instructions. Read the
+[configuration reference](docs/configuration.md) before exposing an
+instance to a network.
 
-## Production
+## Languages
 
-Production-ready releases are not yet available. For development deployment
-instructions, see [`docs/installation.md`](docs/installation.md). The
-production Compose configuration is in `docker/docker-compose.yml`.
-
-## Client
-
-The repository includes the `redxt-cli` companion client and `redxt-agent`.
-Their current commands and flags are documented in [`docs/cli.md`](docs/cli.md);
-the full operator and managed-node workflows remain in development.
-
-## Configuration
-
-redxt reads `server.yml`, environment variables, and CLI flags. See
-[`docs/configuration.md`](docs/configuration.md) for current settings.
+The server, CLI, and agent include English, Spanish, Chinese, French,
+Arabic, German, Italian, and Japanese translations. Arabic uses a
+right-to-left interface. See the [translation guide](docs/translating.md) to
+contribute.
 
 ## API
 
-Current server endpoints include:
-
-- Health: `GET https://redxt.us/server/healthz`
-- API discovery: `GET https://redxt.us/api/v1` (or `/api/autodiscover`)
-- Versioned health: `GET https://redxt.us/api/v1/server/healthz`
-- Privacy details: `GET https://redxt.us/api/v1/server/privacy`
-- Public pages: `/`, `/server/about`, `/server/help`, `/server/privacy`, and
-  `/server/preferences`; the preferences page links to stateless cross-device
-  export/import at `/server/preferences/sync`
-- DNS-over-HTTPS: `GET https://redxt.us/dns-query?dns={base64url-message}`
-  or `POST https://redxt.us/dns-query` with `Content-Type: application/dns-message`
-- DNS-over-TLS and DNS-over-QUIC: dedicated listeners on configured DNS
-  addresses when a usable certificate is available
-
-These URLs represent the configured official hostname. The same paths are
-available on a self-hosted instance. See [`docs/api.md`](docs/api.md) for the
-implemented API surface.
-
-## Other
-
-- [Installation](docs/installation.md)
-- [API reference](docs/api.md)
-- [Backup and restore](docs/backup.md)
-- [Security](docs/security.md)
-- [Integrations](docs/integrations.md)
-- [Translating](docs/translating.md)
-- [Implementation backlog](TODO.AI.md)
+The versioned REST API is rooted at `/api/v1/`. Public health and discovery
+routes, DNS endpoints, and the administration API are documented in the
+[API reference](docs/api.md). The browser interface and its public pages are
+described in the [web app guide](docs/web-app.md).
 
 ## Development
 
-Go builds and tests run in the project’s Docker toolchain. Common commands:
+Builds and tests run in the project Docker toolchain. Common commands are:
 
 ```bash
 make test
@@ -105,26 +64,23 @@ make build
 make docker
 ```
 
-See [`docs/development.md`](docs/development.md) for the development workflow.
+See the [development guide](docs/development.md) for prerequisites and
+verification tiers.
 
-## Disclaimer
+## Documentation
 
-This software is provided "as is" without warranty of any kind. Use it only
-after evaluating whether it is suitable for your environment.
-
-- **No Warranty**: The authors are not responsible for damages, data loss,
-  or other issues arising from use of this software.
-- **Not Professional Advice**: This software does not provide legal,
-  financial, medical, or other professional advice.
-- **Third-Party Services**: External services used with redxt are subject to
-  their own terms.
-- **Security**: No software can be guaranteed free of vulnerabilities.
-- **Production Use**: The project is under active development; evaluate it
-  thoroughly before production use.
-
-By using this software, you acknowledge that you have read and understood
-this disclaimer.
+- [Installation](docs/installation.md)
+- [Configuration](docs/configuration.md)
+- [API reference](docs/api.md)
+- [CLI reference](docs/cli.md)
+- [Backup and restore](docs/backup.md)
+- [Admin panel](docs/admin.md)
+- [Web app and offline behavior](docs/web-app.md)
+- [Security](docs/security.md)
+- [Integrations](docs/integrations.md)
+- [Development](docs/development.md)
+- [Translating](docs/translating.md)
 
 ## License
 
-MIT — see [`LICENSE.md`](LICENSE.md).
+MIT — see [LICENSE.md](LICENSE.md).

@@ -36,9 +36,16 @@ application name and tagline settings, editable SSL/TLS and ACME settings at
 `/server/{admin_path}/ssl`, Server Admin API token management at
 `/server/{admin_path}/security/tokens`, server information, theme choice, per-admin
 appearance preferences, scheduler controls, log viewer, email delivery
-settings, update controls, and logout. The
-Pages → Help editor at `/server/{admin_path}/pages/help` updates the public
-MCP guide stored in `server.pages.help.mcp` under `yaml.d/pages.yml`.
+settings, update controls, and logout. The Pages area at
+`/server/{admin_path}/pages` provides server-rendered editors for About,
+Privacy, Terms, and footer branding. Each editor supports save, sanitized
+preview, and reset to built-in content; footer content accepts strictly
+sanitized HTML. The Pages → Help editor at
+`/server/{admin_path}/pages/help` updates the public MCP project guide stored
+in `server.pages.help.mcp` under `yaml.d/pages.yml`. The Bearer API provides
+page GET/PATCH operations, reset, and sanitizer preview; CAPTCHA secrets are
+omitted from every response. See [the API reference](api.md) for methods and
+access scopes.
 The SSL/TLS form includes the complete
 lego DNS provider list and a free-form `VARIABLE=value` credential editor;
 credential values are never returned to the page. Operators can set certificate
@@ -51,6 +58,22 @@ font size, reduced motion, date format, and time format in the administrator's
 own preferences. Pages require an authenticated Server Admin session; a
 Regular User is redirected to their own account area. An administrator can
 only read or update their own preference page.
+
+Privacy controls are at `/server/{admin_path}/privacy`. They edit the data-sale
+flag, sharing conditions, consent notice and choices, cookie descriptions,
+retention, and third-party disclosures. `stored_on_server` is displayed as a
+read-only fact. Enabling data sale displays the CCPA warning and enables the
+sold-data notice field. The public page's project-owned collection, usage, and
+security text is shown in the full-page preview and is not editable there;
+operators can add a sanitized Markdown extension from the privacy settings page
+or Pages → Privacy. The full-page preview includes the consent banner, disables
+its actions, and can show both sold and not-sold states.
+
+Analytics settings are at `/server/{admin_path}/tracking`. The form supports
+all configured providers, validates IDs and HTTPS URLs before saving, tests
+self-hosted endpoints with a five-second timeout, and displays the generated
+provider markup. Visitors receive tags only after analytics consent; Tor and
+I2P requests never load the providers.
 
 The own-profile page at `/server/{admin_path}/{admin_username}/profile` supports
 routine password changes. The current password is required, and the new password

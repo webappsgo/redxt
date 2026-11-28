@@ -85,6 +85,31 @@ canonical `yaml.d/pages.yml` area file.
 | `accounts.yml` | `server.auth`, `server.users`, `server.orgs`, `server.session`, `server.admin`, `server.admin_path` |
 | `app.yml` | Other project-defined sections |
 
+`server.auth.partial_session_ttl` controls how long a password-verified login
+may wait for its second-factor challenge. It defaults to `5m`; a non-positive
+value is reset to that default with a configuration warning. The token is
+single-use and stored only as a SHA-256 hash in `partial_sessions`.
+
+`server.seo.sitemap.max_urls` sets the sitemap URL limit (1–50,000; default
+50,000), and `server.seo.sitemap.include_images` controls image URLs when
+public image entries exist. `server.seo.feed.max_items` sets the feed entry
+limit (1–200; default 50), while `server.seo.feed.title` overrides the
+application name used by the Atom and RSS channels. The server always serves
+`/sitemap.xml`, `/feed.xml`, and `/rss.xml`; when the project has no public
+permalink resource, both feeds remain valid and contain no entries.
+
+`web.robots.allow` and `web.robots.deny` configure path prefixes emitted by
+`/robots.txt`. The admin route is always disallowed. The sitemap includes only
+mounted public HTML pages permitted by these rules, and the `Sitemap:` value
+is resolved from each request's public origin.
+
+`server.contact.dpo.name` and `server.contact.dpo.email` configure the public
+Data Protection Officer page at `/server/dpo` and its JSON mirror at
+`/api/{api_version}/server/dpo`. When no DPO email is set, the public page and
+API use `server.contact.general.email`; the server admin email is never shown
+there. If neither public address is configured, the page links to the public
+security contact information.
+
 On startup, legacy `server.yml` and drop-in settings in the wrong owner file
 are moved to their canonical area file. Existing canonical owner values win
 collisions. The original `server.yml` is copied to `server.yml.bak` (mode
@@ -170,6 +195,11 @@ CORS. Credentials are not allowed with the wildcard fallback.
 responses. The default enables a two-year max age with `includeSubDomains` and
 `preload`; tune it with `web.hsts.max_age_seconds`. Legacy `server.web.*`
 settings migrate into root `web.*` settings.
+
+`web.headers.honor_dnt` defaults to `false`. When enabled, `DNT: 1` disables
+non-essential cookies and personalization for that request and records the
+signal in the compliance audit. It does not create a CCPA sale/sharing opt-out;
+only `Sec-GPC: 1` does that.
 
 ## API Token Lifetimes
 
@@ -302,3 +332,20 @@ eligible releases without replacing the running binary. `server.update.defer_day
 delays scheduled eligibility by 0–365 days, while a manual update check ignores
 the delay. The CLI can change the canonical setting with
 `redxt --update branch {stable|beta|devel}`.
+
+## Analytics tracking
+
+`server.tracking` configures one analytics provider. Supported types are
+`google`, `matomo`, `piwik`, `owa`, `fathom`, `plausible`, `umami`, `simple`,
+and `cloudflare`; an empty type or `none` disables tracking. Provider-specific
+IDs and URLs are validated at startup. Matomo, Piwik, Open Web Analytics, and
+Umami require an HTTPS base URL; Fathom and Plausible accept an optional
+self-hosted HTTPS URL.
+
+Tracking tags are included only when analytics cookies are enabled and the
+visitor has granted analytics consent. Providers requiring generated
+JavaScript load it from the same-origin `/server/tracking.js` endpoint, which
+returns 404 without consent. CSP permits only the configured provider host.
+Tracking is omitted for Tor and I2P requests, and the endpoint returns 404 for
+overlay requests. The Simple Analytics no-script pixel is subject to the same
+consent and overlay rules.

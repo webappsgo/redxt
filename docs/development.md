@@ -24,7 +24,10 @@ make test
 ```
 
 Runs the quality gates and unit tests in the Go toolchain container, then
-builds the debug binaries and checks them in an isolated Alpine container.
+builds the host-platform debug binaries directly in one Go toolchain
+container and checks them in an isolated Alpine container. This basic test
+tier builds only the server, CLI, and agent binaries it exercises; use
+`make build` for all eight platform artifacts.
 Use `make build` when you need the local debug binary and all eight platform
 artifacts without running the checks. The server, CLI, and agent are not run
 directly on the development host.
@@ -39,8 +42,10 @@ the source checkout. See the Docker volume rules in `AI.md` PART 27.
 `make test` runs the quality gates (`go vet`, `staticcheck`,
 `govulncheck`, shell lint and formatting), the Go unit tests with the
 coverage threshold, and the basic binary checks in `tests/run_tests.sh`.
-The binary checks build through `make build` and run the binaries in a
-disposable Docker container.
+The binary checks build the host-platform server, CLI, and agent directly
+with the Docker Go toolchain, then run them in a disposable Docker container.
+They use a project-scoped temporary directory for Go build temporary files;
+`make build` remains the separate command for all-platform artifacts.
 
 The full systemd/OpenRC lifecycle checks are run explicitly with
 `./tests/incus.sh`; clean-OS VM checks use `./tests/virt.sh` when Incus VM

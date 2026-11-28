@@ -51,7 +51,9 @@ operator-provisioned assets from `{data_dir}/cli/` (or
 
 `/server` permanently redirects to `/server/about`. The server-rendered pages
 are available at `/server/about`, `/server/help`, `/server/help/mcp`,
-`/server/privacy`, and `/server/preferences`. The MCP help page shows the
+`/server/privacy`, `/server/terms`, and `/server/preferences`. The Terms page
+uses the built-in United States default unless an operator override is set.
+The MCP help page shows the
 request-resolved endpoint, aliases, token setup, connection examples, live
 tools, and the configured project guide. The privacy page displays the
 effective deployment privacy settings. Its consent form posts to
@@ -66,6 +68,8 @@ accepted Preferences consent.
 
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
+| GET | `/api/{api_version}/server/about` | Public | Read the localized About source and format used by the public page. |
+| GET | `/api/{api_version}/server/terms` | Public | Read localized Terms source and format; the built-in terms are returned when no override is configured. |
 | GET | `/api/{api_version}/server/privacy` | Public | Read effective privacy, cookie, retention, sharing, and conditional CCPA data. |
 | GET | `/api/{api_version}/server/help/mcp` | Public | Read MCP endpoint URL, aliases, Bearer scheme, live standard-token tools, and project guide. |
 | GET | `/api/{api_version}/server/preferences` | Public | Read the current browser's effective guest theme, language, and application preferences. |
@@ -135,6 +139,10 @@ password or contact an administrator for a permanent lock.
 | POST | `/api/{api_version}/server/{admin_path}/security/tokens/{id}/rotate` | Global-scope Bearer operator or Server Admin token | Replace the token secret and return it once; its scope and expiry are preserved. |
 | GET | `/api/{api_version}/server/{admin_path}/security/locked-accounts` | Bearer operator or Server Admin token | List accounts with an active temporary or permanent lock, including account kind, numeric ID, expiry, and permanent-lock state. |
 | DELETE | `/api/{api_version}/server/{admin_path}/security/locked-accounts/{kind}/{id}` | Global-scope Bearer operator or Server Admin token | Clear a user's or admin's lockout state and failure history; `kind` is `user` or `admin`. |
+| GET | `/api/{api_version}/server/{admin_path}/pages` | Bearer operator or Server Admin token | Read configured page content, contact-form controls, and the configured MCP help section. |
+| GET, PATCH | `/api/{api_version}/server/{admin_path}/pages/{page}` | Bearer operator or Server Admin token; PATCH requires global scope | Read or update About, Privacy, Terms, Contact, or Help settings. About, Privacy, and Terms accept `{ "format": "md|html|txt", "body": "..." }` or a locale-to-body object. Contact PATCH accepts enabled/captcha/site-key/secret/success-message fields; secret values are never returned. Help edits the MCP project guide. |
+| DELETE | `/api/{api_version}/server/{admin_path}/pages/{page}` | Global-scope Bearer operator or Server Admin token | Remove an About, Privacy, or Terms override, or reset Help to its default project guide. |
+| POST | `/api/{api_version}/server/{admin_path}/pages/{page}/preview` | Bearer operator or Server Admin token | Sanitize and render submitted page content without saving it; accepts `format` and `body`, returns rendered `html`. |
 | GET, POST | `/api/{api_version}/server/{admin_path}/agents` | Bearer operator or stored Server Admin token | List admin-scoped agents or create a registration token. POST accepts `name` and optional `tags`; the new `adm_` token is shown once and expires after 24 hours until registration. |
 | POST | `/api/{api_version}/server/{admin_path}/agents/register` | Admin agent token (`adm_`, scope `agent`) | Register the pending agent once with hostname, OS, architecture, version, tags, and optional display name. |
 | POST | `/api/{api_version}/server/{admin_path}/agents/heartbeat` | Registered admin agent token | Update liveness, IP address, uptime, version, and update availability. |
